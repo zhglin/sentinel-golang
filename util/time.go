@@ -43,9 +43,9 @@ var (
 )
 
 func init() {
-	realClock := NewRealClock()
+	realClock := NewRealClock() // 实时时钟
 	currentClock = new(atomic.Value)
-	SetClock(realClock)
+	SetClock(realClock) // 设置当前使用的时钟
 
 	realTickerCreator := NewRealTickerCreator()
 	currentTickerCreator = new(atomic.Value)
@@ -65,6 +65,7 @@ type clockWrapper struct {
 }
 
 // RealClock wraps some APIs of time package.
+// 实时时间
 type RealClock struct{}
 
 func NewRealClock() *RealClock {
@@ -79,19 +80,25 @@ func (t *RealClock) Sleep(d time.Duration) {
 	time.Sleep(d)
 }
 
+// CurrentTimeMillis 毫秒
 func (t *RealClock) CurrentTimeMillis() uint64 {
+	// 开启了useCachedTime
 	tickerNow := CurrentTimeMillsWithTicker()
 	if tickerNow > uint64(0) {
 		return tickerNow
 	}
+
+	// 未开启
 	return uint64(time.Now().UnixNano()) / UnixTimeUnitOffset
 }
 
+// CurrentTimeNano 纳秒
 func (t *RealClock) CurrentTimeNano() uint64 {
 	return uint64(t.Now().UnixNano())
 }
 
 // MockClock is used for testing.
+// 非实时时间
 type MockClock struct {
 	lock sync.RWMutex
 	now  time.Time
@@ -246,11 +253,13 @@ func (tc *MockTickerCreator) NewTicker(d time.Duration) Ticker {
 
 // SetClock sets the clock used by util package.
 // In general, no need to set it. It is usually used for testing.
+// 设置util包使用的时钟。一般来说，不需要设置它。它通常用于测试。
 func SetClock(c Clock) {
 	currentClock.Store(&clockWrapper{c})
 }
 
 // CurrentClock returns the current clock used by util package.
+// 返回util包使用的当前时钟。
 func CurrentClock() Clock {
 	return currentClock.Load().(*clockWrapper).clock
 }
@@ -276,6 +285,7 @@ func FormatTimeMillis(tsMillis uint64) string {
 }
 
 // FormatDate formats Unix timestamp (ms) to date string
+// 格式Unix时间戳(ms)到日期字符串
 func FormatDate(tsMillis uint64) string {
 	return time.Unix(0, int64(tsMillis*UnixTimeUnitOffset)).Format(DateFormat)
 }

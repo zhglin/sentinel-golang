@@ -31,6 +31,7 @@ func GlobalSlotChain() *base.SlotChain {
 	return globalSlotChain
 }
 
+// BuildDefaultSlotChain 对各个函数链添加对应的处理函数
 func BuildDefaultSlotChain() *base.SlotChain {
 	sc := base.NewSlotChain()
 	sc.AddStatPrepareSlot(stat.DefaultResourceNodePrepareSlot)

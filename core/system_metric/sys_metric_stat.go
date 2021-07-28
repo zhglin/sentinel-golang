@@ -43,7 +43,7 @@ var (
 	memoryStatCollectorOnce sync.Once
 	cpuStatCollectorOnce    sync.Once
 
-	CurrentPID         = os.Getpid()
+	CurrentPID         = os.Getpid() // 当前进程的pid
 	currentProcess     atomic.Value
 	currentProcessOnce sync.Once
 	TotalMemorySize    = getTotalMemorySize()
@@ -52,6 +52,7 @@ var (
 )
 
 func init() {
+	// 初始化load cpu memory采集存储
 	currentLoad.Store(NotRetrievedLoadValue)
 	currentCpuUsage.Store(NotRetrievedCpuUsageValue)
 	currentMemoryUsage.Store(NotRetrievedMemoryValue)
@@ -67,6 +68,7 @@ func init() {
 }
 
 // getMemoryStat returns the current machine's memory statistic
+// 返回当前机器的内存统计信息
 func getTotalMemorySize() (total uint64) {
 	stat, err := mem.VirtualMemory()
 	if err != nil {
@@ -76,6 +78,7 @@ func getTotalMemorySize() (total uint64) {
 	return stat.Total
 }
 
+// InitMemoryCollector 初始化并定时更新当前进程的内存消耗量
 func InitMemoryCollector(intervalMs uint32) {
 	if intervalMs == 0 {
 		return
@@ -84,6 +87,7 @@ func InitMemoryCollector(intervalMs uint32) {
 		// Initial memory retrieval.
 		retrieveAndUpdateMemoryStat()
 
+		// 定时更新
 		ticker := util.NewTicker(time.Duration(intervalMs) * time.Millisecond)
 		go util.RunWithRecover(func() {
 			for {
@@ -99,6 +103,7 @@ func InitMemoryCollector(intervalMs uint32) {
 	})
 }
 
+// 获取并设置当前进程的内存的固定消耗量
 func retrieveAndUpdateMemoryStat() {
 	memoryUsedBytes, err := GetProcessMemoryStat()
 	if err != nil {
@@ -110,6 +115,7 @@ func retrieveAndUpdateMemoryStat() {
 }
 
 // GetProcessMemoryStat gets current process's memory usage in Bytes
+// 获取当前进程的固定内存消耗
 func GetProcessMemoryStat() (int64, error) {
 	curProcess := currentProcess.Load()
 	if curProcess == nil {
@@ -126,12 +132,13 @@ func GetProcessMemoryStat() (int64, error) {
 	memInfo, err := p.MemoryInfo()
 	var rss int64
 	if memInfo != nil {
-		rss = int64(memInfo.RSS)
+		rss = int64(memInfo.RSS) // 固定的内存消耗
 	}
 
 	return rss, err
 }
 
+// InitCpuCollector 初始化并定时更新当前进程的cpu利用率
 func InitCpuCollector(intervalMs uint32) {
 	if intervalMs == 0 {
 		return
@@ -140,6 +147,7 @@ func InitCpuCollector(intervalMs uint32) {
 		// Initial memory retrieval.
 		retrieveAndUpdateCpuStat()
 
+		// 定时更新
 		ticker := util.NewTicker(time.Duration(intervalMs) * time.Millisecond)
 		go util.RunWithRecover(func() {
 			for {
@@ -155,6 +163,7 @@ func InitCpuCollector(intervalMs uint32) {
 	})
 }
 
+// 获取并设置cpu的利用率
 func retrieveAndUpdateCpuStat() {
 	cpuPercent, err := getProcessCpuStat()
 	if err != nil {
@@ -166,6 +175,7 @@ func retrieveAndUpdateCpuStat() {
 }
 
 // getProcessCpuStat gets current process's memory usage in Bytes
+// 当前pid的cpu利用率
 func getProcessCpuStat() (float64, error) {
 	curProcess := currentProcess.Load()
 	if curProcess == nil {
@@ -182,14 +192,17 @@ func getProcessCpuStat() (float64, error) {
 	return p.Percent(0)
 }
 
+// InitLoadCollector 定时更新一分钟的load值
 func InitLoadCollector(intervalMs uint32) {
 	if intervalMs == 0 {
 		return
 	}
 	loadStatCollectorOnce.Do(func() {
 		// Initial retrieval.
+		// 初始化一次
 		retrieveAndUpdateLoadStat()
 
+		// 定时更新
 		ticker := util.NewTicker(time.Duration(intervalMs) * time.Millisecond)
 		go util.RunWithRecover(func() {
 			for {
@@ -205,6 +218,7 @@ func InitLoadCollector(intervalMs uint32) {
 	})
 }
 
+// 获取一分钟的load值
 func retrieveAndUpdateLoadStat() {
 	loadStat, err := load.Avg()
 	if err != nil {

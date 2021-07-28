@@ -20,14 +20,15 @@ type EntryContext struct {
 	entry *SentinelEntry
 	// internal error when sentinel Entry or
 	// biz error of downstream
+	// sentinel输入时出现内部错误或下游业务错误
 	err error
 	// Use to calculate RT
-	startTime uint64
+	startTime uint64 // 创建EntryContext的时间
 	// the rt of this transaction
 	rt uint64
 
-	Resource *ResourceWrapper
-	StatNode StatNode
+	Resource *ResourceWrapper // 资源信息
+	StatNode StatNode         // 滑动窗口统计信息
 
 	Input *SentinelInput
 	// the result of rule slots check

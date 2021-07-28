@@ -17,6 +17,7 @@ package base
 import "fmt"
 
 // ResourceType represents classification of the resources
+// 表示资源的分类
 type ResourceType int32
 
 const (
@@ -30,12 +31,15 @@ const (
 )
 
 // TrafficType describes the traffic type: Inbound or Outbound
+// 标记该埋点资源的流量类型
 type TrafficType int32
 
 const (
 	// Inbound represents the inbound traffic (e.g. provider)
+	// 入口流量
 	Inbound TrafficType = iota
 	// Outbound represents the outbound traffic (e.g. consumer)
+	// 出口流量
 	Outbound
 )
 
@@ -51,6 +55,7 @@ func (t TrafficType) String() string {
 }
 
 // ResourceWrapper represents the invocation
+// resource基本信息
 type ResourceWrapper struct {
 	// global unique resource name
 	name string

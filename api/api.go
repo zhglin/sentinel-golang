@@ -36,8 +36,8 @@ var entryOptsPool = sync.Pool{
 
 // EntryOptions represents the options of a Sentinel resource entry.
 type EntryOptions struct {
-	resourceType base.ResourceType
-	entryType    base.TrafficType
+	resourceType base.ResourceType // 资源分类
+	entryType    base.TrafficType  // 流量类型
 	batchCount   uint32
 	flag         int32
 	slotChain    *base.SlotChain
@@ -45,6 +45,7 @@ type EntryOptions struct {
 	attachments  map[interface{}]interface{}
 }
 
+// Reset 重置EntryOptions
 func (o *EntryOptions) Reset() {
 	o.resourceType = base.ResTypeCommon
 	o.entryType = base.Outbound
@@ -130,6 +131,7 @@ func WithAttachments(data map[interface{}]interface{}) EntryOption {
 }
 
 // Entry is the basic API of Sentinel.
+// opts转换成option
 func Entry(resource string, opts ...EntryOption) (*base.SentinelEntry, *base.BlockError) {
 	options := entryOptsPool.Get().(*EntryOptions)
 	defer func() {

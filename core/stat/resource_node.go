@@ -20,13 +20,14 @@ import (
 )
 
 type ResourceNode struct {
-	BaseStatNode
+	BaseStatNode		// 滑动窗口统计信息
 
-	resourceName string
-	resourceType base.ResourceType
+	resourceName string	// 资源名称
+	resourceType base.ResourceType	// 资源类型
 }
 
 // NewResourceNode creates a new resource node with given name and classification.
+// 使用给定的名称和分类创建一个新的资源节点。
 func NewResourceNode(resourceName string, resourceType base.ResourceType) *ResourceNode {
 	return &ResourceNode{
 		BaseStatNode: *NewBaseStatNode(config.MetricStatisticSampleCount(), config.MetricStatisticIntervalMs()),

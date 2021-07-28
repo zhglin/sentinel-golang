@@ -31,18 +31,19 @@ import (
 	"github.com/pkg/errors"
 )
 
+// DefaultMetricLogWriter 监控日志
 type DefaultMetricLogWriter struct {
 	baseDir      string
-	baseFilename string
+	baseFilename string		// 文件名前缀 serviceName-metrics.log.pid
 
-	maxSingleSize uint64
-	maxFileAmount uint32
+	maxSingleSize uint64	// 单个文件大小
+	maxFileAmount uint32	// 保留下的文件数
 
 	timezoneOffsetSec int64
 	latestOpSec       int64
 
-	curMetricFile    *os.File
-	curMetricIdxFile *os.File
+	curMetricFile    *os.File	// 当前写入的文件
+	curMetricIdxFile *os.File	// 当前写入的索引文件
 
 	metricOut *bufio.Writer
 	idxOut    *bufio.Writer
@@ -147,6 +148,7 @@ func (d *DefaultMetricLogWriter) rollFileIfSizeExceeded(time uint64) error {
 	return nil
 }
 
+// 新建下一个日志文件名，并清理文件
 func (d *DefaultMetricLogWriter) rollToNextFile(time uint64) error {
 	newFilename, err := d.nextFileNameOfTime(time)
 	if err != nil {
@@ -155,6 +157,7 @@ func (d *DefaultMetricLogWriter) rollToNextFile(time uint64) error {
 	return d.closeCurAndNewFile(newFilename)
 }
 
+// 写入索引文件内容
 func (d *DefaultMetricLogWriter) writeIndex(time, offset int64) error {
 	out := d.idxOut
 	if out == nil {
@@ -173,12 +176,14 @@ func (d *DefaultMetricLogWriter) writeIndex(time, offset int64) error {
 	return out.Flush()
 }
 
+// 删掉超过数量限制的文件
 func (d *DefaultMetricLogWriter) removeDeprecatedFiles() error {
 	files, err := listMetricFiles(d.baseDir, d.baseFilename)
 	if err != nil || len(files) == 0 {
 		return err
 	}
 	amountToRemove := len(files) - int(d.maxFileAmount) + 1
+	// 删掉超过d.maxFileAmount的文件以及索引文件
 	for i := 0; i < amountToRemove; i++ {
 		filename := files[i]
 		idxFilename := formMetricIdxFileName(filename)
@@ -199,7 +204,9 @@ func (d *DefaultMetricLogWriter) removeDeprecatedFiles() error {
 	return err
 }
 
+// 返回下一个log的文件名
 func (d *DefaultMetricLogWriter) nextFileNameOfTime(time uint64) (string, error) {
+	// 判断是否有当天的文件名
 	dateStr := util.FormatDate(time)
 	filePattern := d.baseFilename + "." + dateStr
 	list, err := listMetricFilesConditional(d.baseDir, filePattern, func(fn string, p string) bool {
@@ -208,9 +215,12 @@ func (d *DefaultMetricLogWriter) nextFileNameOfTime(time uint64) (string, error)
 	if err != nil {
 		return "", err
 	}
+	// 没有重复的文件 直接使用
 	if len(list) == 0 {
 		return filepath.Join(d.baseDir, filePattern), nil
 	}
+
+	// 有重复的 根据最后的文件名后的数字+1
 	last := list[len(list)-1]
 	var n uint32 = 0
 	items := strings.Split(last, ".")
@@ -223,12 +233,15 @@ func (d *DefaultMetricLogWriter) nextFileNameOfTime(time uint64) (string, error)
 	return filepath.Join(d.baseDir, fmt.Sprintf("%s.%d", filePattern, n+1)), nil
 }
 
+// 删除超过数量限制的文件 创建新的filename文件
 func (d *DefaultMetricLogWriter) closeCurAndNewFile(filename string) error {
+	// 删除多余文件
 	err := d.removeDeprecatedFiles()
 	if err != nil {
 		return err
 	}
 
+	// 关闭当前文件以及索引文件
 	if d.curMetricFile != nil {
 		if err = d.curMetricFile.Close(); err != nil {
 			logging.Error(err, "Failed to close metric log file in DefaultMetricLogWriter.closeCurAndNewFile()", "curMetricFile", d.curMetricFile.Name())
@@ -239,13 +252,16 @@ func (d *DefaultMetricLogWriter) closeCurAndNewFile(filename string) error {
 			logging.Error(err, "Failed to close metric index file in DefaultMetricLogWriter.closeCurAndNewFile()", "curMetricIdxFile", d.curMetricIdxFile.Name())
 		}
 	}
+
 	// Create new metric log file, whether it exists or not.
+	// 创建新的日志文件，不管它是否存在。
 	mf, err := os.Create(filename)
 	if err != nil {
 		return err
 	}
 	logging.Info("[MetricWriter] New metric log file created", "filename", filename)
 
+	// 创建索引文件
 	idxFile := formMetricIdxFileName(filename)
 	mif, err := os.Create(idxFile)
 	if err != nil {
@@ -262,8 +278,10 @@ func (d *DefaultMetricLogWriter) closeCurAndNewFile(filename string) error {
 	return nil
 }
 
+// 初始化
 func (d *DefaultMetricLogWriter) initialize() error {
 	// Create the dir if not exists.
+	// 创建目录
 	err := util.CreateDirIfNotExists(d.baseDir)
 	if err != nil {
 		return err
@@ -296,6 +314,7 @@ func NewDefaultMetricLogWriterOfApp(maxSize uint64, maxFileAmount uint32, appNam
 	}
 	_, offset := util.Now().Zone()
 
+	// 目录 文件名
 	logDir := config.LogBaseDir()
 	if len(logDir) == 0 {
 		logDir = config.GetDefaultLogDir()

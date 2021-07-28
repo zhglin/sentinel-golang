@@ -46,12 +46,12 @@ const (
 )
 
 var (
-	DefaultDirName = filepath.Join("logs", "csp")
+	DefaultDirName = filepath.Join("logs", "csp") // 日志记录的默认目录
 )
 
 var (
 	globalLogLevel = InfoLevel
-	globalLogger   = NewConsoleLogger()
+	globalLogger   = NewConsoleLogger() // 全局的logger
 
 	FrequentErrorOnce = &sync.Once{}
 )
@@ -74,6 +74,8 @@ func GetGlobalLogger() Logger {
 
 // ResetGlobalLogger sets the Sentinel global logger
 // Note: this function is not thread-safe.
+// 设置Sentinel全局日志
+// 注意:这个函数不是线程安全的。
 func ResetGlobalLogger(log Logger) error {
 	if log == nil {
 		return errors.New("nil logger")

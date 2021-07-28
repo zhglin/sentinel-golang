@@ -33,6 +33,7 @@ func (s *ResourceNodePrepareSlot) Order() uint32 {
 	return PrepareSlotOrder
 }
 
+// Prepare 创建并设置resourceNode
 func (s *ResourceNodePrepareSlot) Prepare(ctx *base.EntryContext) {
 	node := GetOrCreateResourceNode(ctx.Resource.Name(), ctx.Resource.Classification())
 	// Set the resource node to the context.

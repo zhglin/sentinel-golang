@@ -19,6 +19,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// RunWithRecover 安全的go
 func RunWithRecover(f func()) {
 	defer func() {
 		if err := recover(); err != nil {

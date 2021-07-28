@@ -18,7 +18,7 @@ package base
 const (
 	TotalInBoundResourceName = "__total_inbound_traffic__"
 
-	DefaultMaxResourceAmount uint32 = 10000
+	DefaultMaxResourceAmount uint32 = 10000	// 资源的最大数量
 
 	DefaultSampleCount uint32 = 2
 	DefaultIntervalMs  uint32 = 1000

@@ -17,6 +17,7 @@ package util
 import "strings"
 
 // IsBlank checks whether the given string is blank.
+// 检查给定字符串是否为空。
 func IsBlank(s string) bool {
 	return strings.TrimSpace(s) == ""
 }

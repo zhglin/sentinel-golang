@@ -42,8 +42,10 @@ var (
 	initOnce     sync.Once
 )
 
+// InitTask 启动监控日志模块
 func InitTask() (err error) {
 	initOnce.Do(func() {
+		// 刷新间隔为0
 		flushInterval := config.MetricLogFlushIntervalSec()
 		if flushInterval == 0 {
 			return

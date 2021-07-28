@@ -47,6 +47,7 @@ func ResourceNodeList() []*ResourceNode {
 	return list
 }
 
+// GetResourceNode 获取资源统计信息
 func GetResourceNode(resource string) *ResourceNode {
 	rnsMux.RLock()
 	defer rnsMux.RUnlock()
@@ -54,6 +55,7 @@ func GetResourceNode(resource string) *ResourceNode {
 	return resNodeMap[resource]
 }
 
+// GetOrCreateResourceNode 获取或创建资源的统计信息
 func GetOrCreateResourceNode(resource string, resourceType base.ResourceType) *ResourceNode {
 	node := GetResourceNode(resource)
 	if node != nil {
@@ -67,6 +69,7 @@ func GetOrCreateResourceNode(resource string, resourceType base.ResourceType) *R
 		return node
 	}
 
+	// 新建resourceNode
 	if len(resNodeMap) >= int(base.DefaultMaxResourceAmount) {
 		logging.Warn("[GetOrCreateResourceNode] Resource amount exceeds the threshold", "maxResourceAmount", base.DefaultMaxResourceAmount)
 	}

@@ -19,11 +19,12 @@ const (
 	// that indicates the project name is absent.
 	UnknownProjectName = "unknown_go_service"
 
+	// env配置
 	ConfFilePathEnvKey = "SENTINEL_CONFIG_FILE_PATH"
-	AppNameEnvKey      = "SENTINEL_APP_NAME"
-	AppTypeEnvKey      = "SENTINEL_APP_TYPE"
-	LogDirEnvKey       = "SENTINEL_LOG_DIR"
-	LogNamePidEnvKey   = "SENTINEL_LOG_USE_PID"
+	AppNameEnvKey      = "SENTINEL_APP_NAME"	// app名称
+	AppTypeEnvKey      = "SENTINEL_APP_TYPE"	// app类型
+	LogDirEnvKey       = "SENTINEL_LOG_DIR"		// 日志目录
+	LogNamePidEnvKey   = "SENTINEL_LOG_USE_PID" // 监控日志文件名是否带上进程 PID
 
 	DefaultConfigFilename       = "sentinel.yml"
 	DefaultAppType        int32 = 0

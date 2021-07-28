@@ -20,6 +20,7 @@ import (
 	"os"
 )
 
+// FilePosition 重置文件写入位置
 func FilePosition(file *os.File) (int64, error) {
 	if file == nil {
 		return 0, errors.New("null fd when retrieving file position")
@@ -37,6 +38,7 @@ func FileExists(name string) (b bool, err error) {
 	return true, err
 }
 
+// CreateDirIfNotExists 创建日志目录
 func CreateDirIfNotExists(dirname string) error {
 	if _, err := os.Stat(dirname); err != nil {
 		if os.IsNotExist(err) {

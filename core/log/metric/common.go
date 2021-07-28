@@ -36,7 +36,7 @@ const (
 	// FilePidPrefix represents the pid flag of filename.
 	FilePidPrefix = "pid"
 
-	metricFilePattern = `\.[0-9]{4}-[0-9]{2}-[0-9]{2}(\.[0-9]*)?`
+	metricFilePattern = `\.[0-9]{4}-[0-9]{2}-[0-9]{2}(\.[0-9]*)?` // 日期匹配规则
 )
 
 var metricFileRegex = regexp.MustCompile(metricFilePattern)
@@ -53,13 +53,17 @@ type MetricSearcher interface {
 	FindFromTimeWithMaxLines(beginTimeMs uint64, maxLines uint32) ([]*base.MetricItem, error)
 }
 
-// Generate the metric file name from the service name.
+// FormMetricFileName Generate the metric file name from the service name.
+// 从服务名称生成监控文件名称。
 func FormMetricFileName(serviceName string, withPid bool) string {
+	// serviceName中.转成-
 	dot := "."
 	separator := "-"
 	if strings.Contains(serviceName, dot) {
 		serviceName = strings.ReplaceAll(serviceName, dot, separator)
 	}
+
+	// 文件名
 	filename := serviceName + separator + MetricFileNameSuffix
 	if withPid {
 		pid := os.Getpid()
@@ -69,19 +73,23 @@ func FormMetricFileName(serviceName string, withPid bool) string {
 }
 
 // Generate the metric index filename from the metric log filename.
+// 从度量日志文件名生成度量索引文件名。
 func formMetricIdxFileName(metricFilename string) string {
 	return metricFilename + MetricIdxSuffix
 }
 
+// 文件名正则匹配筛选
 func filenameMatches(filename, baseFilename string) bool {
 	if !strings.HasPrefix(filename, baseFilename) {
 		return false
 	}
 	part := filename[len(baseFilename):]
 	// part is like: ".yyyy-MM-dd.number", eg. ".2018-12-24.11"
+	// 匹配后面的日期
 	return metricFileRegex.MatchString(part)
 }
 
+// 从baseDir目录中根据predicate函数判断是否存在filePattern的文件
 func listMetricFilesConditional(baseDir string, filePattern string, predicate func(string, string) bool) ([]string, error) {
 	dir, err := ioutil.ReadDir(baseDir)
 	if err != nil {
@@ -89,17 +97,17 @@ func listMetricFilesConditional(baseDir string, filePattern string, predicate fu
 	}
 	arr := make([]string, 0, len(dir))
 	for _, f := range dir {
-		if f.IsDir() {
+		if f.IsDir() {  // 跳过目录
 			continue
 		}
-		name := f.Name()
+		name := f.Name() // 文件名
 		if predicate(name, filePattern) && !strings.HasSuffix(name, MetricIdxSuffix) && !strings.HasSuffix(name, FileLockSuffix) {
 			// Put the absolute path into the slice.
 			arr = append(arr, filepath.Join(baseDir, name))
 		}
 	}
 	if len(arr) > 1 {
-		sort.Slice(arr, filenameComparator(arr))
+		sort.Slice(arr, filenameComparator(arr)) // 多个文件进行排序
 	}
 	return arr, nil
 }
@@ -107,10 +115,12 @@ func listMetricFilesConditional(baseDir string, filePattern string, predicate fu
 // List metrics files
 // baseDir: the directory of metrics files
 // filePattern: metric file pattern
+// 在baseDir中按前缀匹配文件名
 func listMetricFiles(baseDir, filePattern string) ([]string, error) {
 	return listMetricFilesConditional(baseDir, filePattern, filenameMatches)
 }
 
+// 对匹配到的文件进行排序 只对最后的日期进行排序 有pid的跟没pid的有区别
 func filenameComparator(arr []string) func(i, j int) bool {
 	return func(i, j int) bool {
 		name1 := filepath.Base(arr[i])

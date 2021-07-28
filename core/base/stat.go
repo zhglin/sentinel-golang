@@ -130,6 +130,7 @@ func CheckValidityForStatistic(sampleCount, intervalInMs uint32) error {
 // The parameters, sampleCount and intervalInMs, are the parameters of the metric statistic you want to build
 // The parameters, parentSampleCount and parentIntervalInMs, are the parameters of the resource's global statistic
 // If compliance passes, return nil, if not returns specific error
+// 校验滑动窗口对应的间隔时间
 func CheckValidityForReuseStatistic(sampleCount, intervalInMs uint32, parentSampleCount, parentIntervalInMs uint32) error {
 	if intervalInMs == 0 || sampleCount == 0 || intervalInMs%sampleCount != 0 {
 		return IllegalStatisticParamsError
@@ -142,6 +143,7 @@ func CheckValidityForReuseStatistic(sampleCount, intervalInMs uint32, parentSamp
 	parentBucketLengthInMs := parentIntervalInMs / parentSampleCount
 
 	//SlidingWindowMetric's intervalInMs is not divisible by BucketLeapArray's intervalInMs
+	// 时间要能被整除
 	if parentIntervalInMs%intervalInMs != 0 {
 		return GlobalStatisticNonReusableError
 	}

@@ -48,6 +48,7 @@ func InitWithParser(configBytes []byte, parser func([]byte) (*config.Entity, err
 }
 
 // InitWithConfig initializes Sentinel using given config.
+// 使用给定的配置初始化Sentinel。
 func InitWithConfig(confEntity *config.Entity) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -77,13 +78,16 @@ func InitWithConfigFile(configPath string) error {
 }
 
 // initCoreComponents init core components with global config
+// 根据配置初始化核心模块
 func initCoreComponents() error {
+	// 监控日志聚合刷盘时间
 	if config.MetricLogFlushIntervalSec() > 0 {
 		if err := metric.InitTask(); err != nil {
 			return err
 		}
 	}
 
+	// 指标收集时间间隔
 	systemStatInterval := config.SystemStatCollectIntervalMs()
 	loadStatInterval := systemStatInterval
 	cpuStatInterval := systemStatInterval
@@ -99,6 +103,7 @@ func initCoreComponents() error {
 		memStatInterval = config.MemoryStatCollectIntervalMs()
 	}
 
+	// 加载load值
 	if loadStatInterval > 0 {
 		system_metric.InitLoadCollector(loadStatInterval)
 	}
@@ -116,6 +121,7 @@ func initCoreComponents() error {
 	return nil
 }
 
+// 根据配置文件路径初始化配置 以及logger
 func initSentinel(configPath string) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
