@@ -28,10 +28,12 @@ type BaseStatNode struct {
 
 	concurrency int32
 
-	arr    *sbase.BucketLeapArray
-	metric *sbase.SlidingWindowMetric
+	arr    *sbase.BucketLeapArray     // 数据的写入
+	metric *sbase.SlidingWindowMetric // arr的读取以及统计计算
 }
 
+// NewBaseStatNode
+// sampleCount=config.MetricStatisticSampleCount(), intervalInMs=config.MetricStatisticIntervalMs()
 func NewBaseStatNode(sampleCount uint32, intervalInMs uint32) *BaseStatNode {
 	la := sbase.NewBucketLeapArray(config.GlobalStatisticSampleCountTotal(), config.GlobalStatisticIntervalMsTotal())
 	metric, _ := sbase.NewSlidingWindowMetric(sampleCount, intervalInMs, la)
@@ -60,6 +62,7 @@ func (n *BaseStatNode) GetSum(event base.MetricEvent) int64 {
 	return n.metric.GetSum(event)
 }
 
+// GetMaxAvg 时间窗口内的 最大值*总的bucket数/时间*1000(转成秒)
 func (n *BaseStatNode) GetMaxAvg(event base.MetricEvent) float64 {
 	return float64(n.metric.GetMaxOfSingleBucket(event)) * float64(n.sampleCount) / float64(n.intervalMs) * 1000.0
 }
@@ -72,6 +75,7 @@ func (n *BaseStatNode) UpdateConcurrency(concurrency int32) {
 	n.arr.UpdateConcurrency(concurrency)
 }
 
+// AvgRT 平均响应时间 总请求数/总的rt
 func (n *BaseStatNode) AvgRT() float64 {
 	complete := n.metric.GetSum(base.MetricEventComplete)
 	if complete <= 0 {
@@ -80,6 +84,7 @@ func (n *BaseStatNode) AvgRT() float64 {
 	return float64(n.metric.GetSum(base.MetricEventRt) / complete)
 }
 
+// MinRT 获取当前时间最低的rt
 func (n *BaseStatNode) MinRT() float64 {
 	return float64(n.metric.MinRT())
 }
@@ -88,6 +93,7 @@ func (n *BaseStatNode) MaxConcurrency() int32 {
 	return n.metric.MaxConcurrency()
 }
 
+// CurrentConcurrency 获取并发数
 func (n *BaseStatNode) CurrentConcurrency() int32 {
 	return atomic.LoadInt32(&(n.concurrency))
 }

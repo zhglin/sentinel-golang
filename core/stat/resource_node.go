@@ -20,10 +20,10 @@ import (
 )
 
 type ResourceNode struct {
-	BaseStatNode		// 滑动窗口统计信息
+	BaseStatNode // 滑动窗口统计信息
 
-	resourceName string	// 资源名称
-	resourceType base.ResourceType	// 资源类型
+	resourceName string            // 资源名称
+	resourceType base.ResourceType // 资源类型
 }
 
 // NewResourceNode creates a new resource node with given name and classification.

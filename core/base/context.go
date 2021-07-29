@@ -32,6 +32,7 @@ type EntryContext struct {
 
 	Input *SentinelInput
 	// the result of rule slots check
+	// 检查的结果
 	RuleCheckResult *TokenResult
 	// reserve for storing some intermediate data from the Entry execution process
 	Data map[interface{}]interface{}

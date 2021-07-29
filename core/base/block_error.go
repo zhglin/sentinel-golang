@@ -17,13 +17,17 @@ package base
 import "fmt"
 
 // BlockError indicates the request was blocked by Sentinel.
+// 表示请求被sentinel阻止。
 type BlockError struct {
-	blockType BlockType
+	blockType BlockType // 系统类型
 	// blockMsg provides additional message for the block error.
+	// 附加信息
 	blockMsg string
 
+	// 具体的规则
 	rule SentinelRule
 	// snapshotValue represents the triggered "snapshot" value
+	// 表示触发的“快照”值
 	snapshotValue interface{}
 }
 

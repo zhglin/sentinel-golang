@@ -28,6 +28,7 @@ var (
 	DefaultAdaptiveSlot = &AdaptiveSlot{}
 )
 
+// AdaptiveSlot 系统自适应保护
 type AdaptiveSlot struct {
 }
 
@@ -36,6 +37,7 @@ func (s *AdaptiveSlot) Order() uint32 {
 }
 
 func (s *AdaptiveSlot) Check(ctx *base.EntryContext) *base.TokenResult {
+	// 非入口流量 跳过
 	if ctx == nil || ctx.Resource == nil || ctx.Resource.FlowType() != base.Inbound {
 		return nil
 	}
@@ -56,6 +58,7 @@ func (s *AdaptiveSlot) Check(ctx *base.EntryContext) *base.TokenResult {
 	return result
 }
 
+// 检查校验系统自适应保护的规则
 func (s *AdaptiveSlot) doCheckRule(rule *Rule) (bool, string, float64) {
 	var msg string
 
@@ -84,8 +87,8 @@ func (s *AdaptiveSlot) doCheckRule(rule *Rule) (bool, string, float64) {
 		return res, msg, rt
 	case Load:
 		l := system_metric.CurrentLoad()
-		if l > threshold {
-			if rule.Strategy != BBR || !checkBbrSimple() {
+		if l > threshold { // 大于load预值
+			if rule.Strategy != BBR || !checkBbrSimple() { // bbr
 				msg = "system load check blocked"
 				return false, msg, l
 			}
@@ -106,6 +109,7 @@ func (s *AdaptiveSlot) doCheckRule(rule *Rule) (bool, string, float64) {
 	}
 }
 
+// 并发数是否超过理论值
 func checkBbrSimple() bool {
 	concurrency := stat.InboundNode().CurrentConcurrency()
 	minRt := stat.InboundNode().MinRT()

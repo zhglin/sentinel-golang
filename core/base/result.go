@@ -31,6 +31,7 @@ const (
 )
 
 var (
+	// 被拦截的校验类型
 	blockTypeMap = map[BlockType]string{
 		BlockTypeUnknown:          "BlockTypeUnknown",
 		BlockTypeFlow:             "BlockTypeFlowControl",
@@ -62,10 +63,11 @@ func (t BlockType) String() string {
 
 type TokenResultStatus uint8
 
+// rule校验过的结果类型
 const (
-	ResultStatusPass TokenResultStatus = iota
-	ResultStatusBlocked
-	ResultStatusShouldWait
+	ResultStatusPass       TokenResultStatus = iota // 通过
+	ResultStatusBlocked                             // 失败
+	ResultStatusShouldWait                          // 等待
 )
 
 func (s TokenResultStatus) String() string {
@@ -168,6 +170,7 @@ func NewTokenResultPass() *TokenResult {
 	return NewTokenResult(ResultStatusPass)
 }
 
+// NewTokenResultBlocked 没有详细信息的blocked
 func NewTokenResultBlocked(blockType BlockType) *TokenResult {
 	return NewTokenResult(ResultStatusBlocked, WithBlockType(blockType))
 }
@@ -176,6 +179,7 @@ func NewTokenResultBlockedWithMessage(blockType BlockType, blockMsg string) *Tok
 	return NewTokenResult(ResultStatusBlocked, WithBlockType(blockType), WithBlockMsg(blockMsg))
 }
 
+// NewTokenResultBlockedWithCause 详细的blocked信息
 func NewTokenResultBlockedWithCause(blockType BlockType, blockMsg string, rule SentinelRule, snapshot interface{}) *TokenResult {
 	return NewTokenResult(ResultStatusBlocked, WithBlockType(blockType), WithBlockMsg(blockMsg), WithRule(rule), WithSnapshotValue(snapshot))
 }

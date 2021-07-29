@@ -31,6 +31,7 @@ var (
 )
 
 // InboundNode returns the global inbound statistic node.
+// 返回全局入站统计节点。
 func InboundNode() *ResourceNode {
 	return inboundNode
 }

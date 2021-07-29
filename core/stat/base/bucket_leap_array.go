@@ -24,14 +24,17 @@ import (
 	"github.com/pkg/errors"
 )
 
-// The implementation of sliding window based on LeapArray (as the sliding window infrastructure)
+// BucketLeapArray The implementation of sliding window based on LeapArray (as the sliding window infrastructure)
 // and MetricBucket (as the data type). The MetricBucket is used to record statistic
 // metrics per minimum time unit (i.e. the bucket time span).
+// 基于LeapArray(作为滑动窗口基础设施)和MetricBucket(作为数据类型)实现滑动窗口。
+// MetricBucket用于记录每个最小时间单位(即桶的时间跨度)的统计指标。
 type BucketLeapArray struct {
-	data     LeapArray
-	dataType string
+	data     LeapArray // 滑动窗口
+	dataType string    // 数据类型 固定的值(MetricBucket)
 }
 
+// NewEmptyBucket 创建新的bucket的函数
 func (bla *BucketLeapArray) NewEmptyBucket() interface{} {
 	return NewMetricBucket()
 }
@@ -42,12 +45,16 @@ func (bla *BucketLeapArray) ResetBucketTo(bw *BucketWrap, startTime uint64) *Buc
 	return bw
 }
 
-// sampleCount is the number of slots
+// NewBucketLeapArray sampleCount is the number of slots
 // intervalInMs is the time length of sliding window
 // sampleCount and intervalInMs must be positive and intervalInMs%sampleCount == 0,
 // the validation must be done before call NewBucketLeapArray
+// sampleCount是槽的数量
+// intervalInMs为滑动窗口的时间长度
+// sampleCount和intervalInMs必须是正的，并且intervalInMs%sampleCount == 0，
+// 验证必须在调用NewBucketLeapArray之前完成
 func NewBucketLeapArray(sampleCount uint32, intervalInMs uint32) *BucketLeapArray {
-	bucketLengthInMs := intervalInMs / sampleCount
+	bucketLengthInMs := intervalInMs / sampleCount // 一个bucket的时间长度
 	ret := &BucketLeapArray{
 		data: LeapArray{
 			bucketLengthInMs: bucketLengthInMs,
@@ -168,6 +175,7 @@ func (bla *BucketLeapArray) Values(now uint64) []*BucketWrap {
 	return bla.data.valuesWithTime(now)
 }
 
+// ValuesConditional 根据predicate函数返回符合条件的bucket
 func (bla *BucketLeapArray) ValuesConditional(now uint64, predicate base.TimePredicate) []*BucketWrap {
 	return bla.data.ValuesConditional(now, predicate)
 }

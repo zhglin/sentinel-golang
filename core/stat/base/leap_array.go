@@ -35,10 +35,17 @@ const (
 // The length of BucketWrap could be seen in LeapArray.
 // The scope of time is [startTime, startTime+bucketLength)
 // The size of BucketWrap is 24(8+16) bytes
+// BucketWrap表示一个记录度量的槽
+// 为了减少内存的使用，BucketWrap不保存BucketWrap的长度
+// 在LeapArray中可以看到bucket twrap的长度。
+// 时间范围为[startTime, startTime+bucketLength]
+// bucket twrap的大小为24(8+16)字节
 type BucketWrap struct {
 	// The start timestamp of this statistic bucket wrapper.
+	// 当前bucket的起始时间
 	BucketStart uint64
 	// The actual data structure to record the metrics (e.g. MetricBucket).
+	// 当前bucket时间段内的统计值
 	Value atomic.Value
 }
 
@@ -50,30 +57,35 @@ func (ww *BucketWrap) isTimeInBucket(now uint64, bucketLengthInMs uint32) bool {
 	return ww.BucketStart <= now && now < ww.BucketStart+uint64(bucketLengthInMs)
 }
 
+// 重新计算当前时间 正好是每个bucket时长的倍数
 func calculateStartTime(now uint64, bucketLengthInMs uint32) uint64 {
 	return now - (now % uint64(bucketLengthInMs))
 }
 
-// atomic BucketWrap array to resolve race condition
+// AtomicBucketWrapArray atomic BucketWrap array to resolve race condition
 // AtomicBucketWrapArray can not append or delete element after initializing
+// AtomicBucketWrapArray在初始化后不能追加或删除元素
 type AtomicBucketWrapArray struct {
 	// The base address for real data array
+	// data数组的起始地址
 	base unsafe.Pointer
 	// The length of slice(array), it can not be modified.
-	length int
+	length int // data的数据长度
 	data   []*BucketWrap
 }
 
+// NewAtomicBucketWrapArrayWithTime 具体的创建AtomicBucketWrapArray的函数
 func NewAtomicBucketWrapArrayWithTime(len int, bucketLengthInMs uint32, now uint64, generator BucketGenerator) *AtomicBucketWrapArray {
 	ret := &AtomicBucketWrapArray{
 		length: len,
 		data:   make([]*BucketWrap, len),
 	}
 
-	timeId := now / uint64(bucketLengthInMs)
-	idx := int(timeId) % len
-	startTime := calculateStartTime(now, bucketLengthInMs)
+	timeId := now / uint64(bucketLengthInMs)               // 当前时间点对应的第几个bucket
+	idx := int(timeId) % len                               // 当前时间在data中的下标
+	startTime := calculateStartTime(now, bucketLengthInMs) // 重新计算当前时间
 
+	// 初始化idx之后的data
 	for i := idx; i <= len-1; i++ {
 		ww := &BucketWrap{
 			BucketStart: startTime,
@@ -83,12 +95,14 @@ func NewAtomicBucketWrapArrayWithTime(len int, bucketLengthInMs uint32, now uint
 		ret.data[i] = ww
 		startTime += uint64(bucketLengthInMs)
 	}
+
+	// 初始化idx之前的data 开始时间累加
 	for i := 0; i < idx; i++ {
 		ww := &BucketWrap{
 			BucketStart: startTime,
 			Value:       atomic.Value{},
 		}
-		ww.Value.Store(generator.NewEmptyBucket())
+		ww.Value.Store(generator.NewEmptyBucket()) // 创建bucketWrap的Value
 		ret.data[i] = ww
 		startTime += uint64(bucketLengthInMs)
 	}
@@ -99,15 +113,20 @@ func NewAtomicBucketWrapArrayWithTime(len int, bucketLengthInMs uint32, now uint
 	return ret
 }
 
-// New AtomicBucketWrapArray with initializing field data
+// NewAtomicBucketWrapArray New AtomicBucketWrapArray with initializing field data
 // Default, automatically initialize each BucketWrap
 // len: length of array
 // bucketLengthInMs: bucket length of BucketWrap
 // generator: generator to generate bucket
+// 默认情况下，自动初始化每个BucketWrap
+// len:数组长度
+// bucketLengthInMs: buckettwrap的时间长度
+// generator:生成桶的发电机
 func NewAtomicBucketWrapArray(len int, bucketLengthInMs uint32, generator BucketGenerator) *AtomicBucketWrapArray {
 	return NewAtomicBucketWrapArrayWithTime(len, bucketLengthInMs, util.CurrentTimeMillis(), generator)
 }
 
+// 校验并返回给定idx的内存地址
 func (aa *AtomicBucketWrapArray) elementOffset(idx int) (unsafe.Pointer, bool) {
 	if idx >= aa.length || idx < 0 {
 		logging.Error(errors.New("array index out of bounds"),
@@ -119,6 +138,7 @@ func (aa *AtomicBucketWrapArray) elementOffset(idx int) (unsafe.Pointer, bool) {
 	return unsafe.Pointer(uintptr(basePtr) + uintptr(idx*PtrSize)), true
 }
 
+// 返回指定的idx的bucket
 func (aa *AtomicBucketWrapArray) get(idx int) *BucketWrap {
 	// aa.elementOffset(idx) return the secondary pointer of BucketWrap, which is the pointer to the aa.data[idx]
 	// then convert to (*unsafe.Pointer)
@@ -150,9 +170,9 @@ func (aa *AtomicBucketWrapArray) compareAndSet(idx int, except, update *BucketWr
 //                                        ^
 //                                      time=888
 type LeapArray struct {
-	bucketLengthInMs uint32
-	sampleCount      uint32
-	intervalInMs     uint32
+	bucketLengthInMs uint32 // 一个bucket的时间长度
+	sampleCount      uint32 // 窗口的总bucket数量
+	intervalInMs     uint32 // 窗口的总时长
 	array            *AtomicBucketWrapArray
 	// update lock
 	updateLock mutex
@@ -249,6 +269,7 @@ func (la *LeapArray) valuesWithTime(now uint64) []*BucketWrap {
 	return ret
 }
 
+// ValuesConditional 根据predicate函数刷选bucket
 func (la *LeapArray) ValuesConditional(now uint64, predicate base.TimePredicate) []*BucketWrap {
 	if now <= 0 {
 		return make([]*BucketWrap, 0)
@@ -265,16 +286,20 @@ func (la *LeapArray) ValuesConditional(now uint64, predicate base.TimePredicate)
 }
 
 // Judge whether the BucketWrap is expired
+// 判断BucketWrap是否过期 是否在窗口内
 func (la *LeapArray) isBucketDeprecated(now uint64, ww *BucketWrap) bool {
 	ws := atomic.LoadUint64(&ww.BucketStart)
 	return (now - ws) > uint64(la.intervalInMs)
 }
 
-// Generic interface to generate bucket
+// BucketGenerator Generic interface to generate bucket
+// 生成桶的bucket的通用接口
 type BucketGenerator interface {
-	// called when timestamp entry a new slot interval
+	// NewEmptyBucket called when timestamp entry a new slot interval
+	// 当时间戳条目为新的槽间隔时调用
 	NewEmptyBucket() interface{}
 
-	// reset the BucketWrap, clear all data of BucketWrap
+	// ResetBucketTo reset the BucketWrap, clear all data of BucketWrap
+	// 重置BucketWrap，清除所有BucketWrap数据
 	ResetBucketTo(bw *BucketWrap, startTime uint64) *BucketWrap
 }

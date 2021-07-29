@@ -59,6 +59,7 @@ type AdaptiveStrategy int32
 const (
 	NoAdaptive AdaptiveStrategy = -1
 	// BBR represents the adaptive strategy based on ideas of TCP BBR.
+	// 表示了基于TCP BBR思想的自适应策略。
 	BBR AdaptiveStrategy = iota
 )
 
@@ -74,15 +75,20 @@ func (t AdaptiveStrategy) String() string {
 }
 
 // Rule describes the policy for system resiliency.
+// 描述用于系统弹性的策略。
 type Rule struct {
 	// ID represents the unique ID of the rule (optional).
+	// 表示规则的唯一ID(可选)。
 	ID string `json:"id,omitempty"`
 	// MetricType indicates the type of the trigger metric.
+	// 规则类型
 	MetricType MetricType `json:"metricType"`
 	// TriggerCount represents the lower bound trigger of the adaptive strategy.
 	// Adaptive strategies will not be activated until target metric has reached the trigger count.
+	// 表示自适应策略的下界触发器。自适应策略将不会被激活，直到目标指标达到触发计数。
 	TriggerCount float64 `json:"triggerCount"`
 	// Strategy represents the adaptive strategy.
+	// 表示自适应策略。
 	Strategy AdaptiveStrategy `json:"strategy"`
 }
 

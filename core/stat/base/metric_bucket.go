@@ -24,10 +24,12 @@ import (
 
 // MetricBucket represents the entity to record metrics per minimum time unit (i.e. the bucket time span).
 // Note that all operations of the MetricBucket are required to be thread-safe.
+// MetricBucket表示每个最小时间单元(即桶时间跨度)记录度量的实体。
+// 注意，MetricBucket的所有操作都必须是线程安全的。
 type MetricBucket struct {
 	// Value of statistic
-	counter        [base.MetricEventTotal]int64
-	minRt          int64
+	counter        [base.MetricEventTotal]int64 // 六种类型的不同统计值 不同类型对应不同下标
+	minRt          int64                        // 最低的rt
 	maxConcurrency int32
 }
 
@@ -57,6 +59,7 @@ func (mb *MetricBucket) addCount(event base.MetricEvent, count int64) {
 }
 
 // Get current statistic count of the given metric event.
+// 给定事件的当前统计计数。
 func (mb *MetricBucket) Get(event base.MetricEvent) int64 {
 	if event >= base.MetricEventTotal || event < 0 {
 		logging.Error(errors.Errorf("Unknown metric event: %v", event), "")

@@ -28,14 +28,19 @@ import (
 // It does not store any data and is the wrapper of BucketLeapArray to adapt to different internal bucket
 // SlidingWindowMetric is used for SentinelRules and BucketLeapArray is used for monitor
 // BucketLeapArray is per resource, and SlidingWindowMetric support only read operation.
+// SlidingWindowMetric表示滑动窗口度量包装器。
+// 它不存储任何数据，是BucketLeapArray的包装器，以适应不同的内部桶
+// SlidingWindowMetric用于SentinelRules, BucketLeapArray用于monitor
+// BucketLeapArray是每个资源，SlidingWindowMetric只支持读操作。
 type SlidingWindowMetric struct {
-	bucketLengthInMs uint32
-	sampleCount      uint32
-	intervalInMs     uint32
+	bucketLengthInMs uint32 // 一个bucket的时长 大于real中的bucketLengthInMs
+	sampleCount      uint32 // 总的bucket数量
+	intervalInMs     uint32 // 窗口总时长 小于 real中的intervalInMs
 	real             *BucketLeapArray
 }
 
-// It must pass the parameter point to the real storage entity
+// NewSlidingWindowMetric It must pass the parameter point to the real storage entity
+// 它必须将参数点传递给真实的存储实体
 func NewSlidingWindowMetric(sampleCount, intervalInMs uint32, real *BucketLeapArray) (*SlidingWindowMetric, error) {
 	if real == nil {
 		return nil, errors.New("nil BucketLeapArray")
@@ -55,6 +60,8 @@ func NewSlidingWindowMetric(sampleCount, intervalInMs uint32, real *BucketLeapAr
 
 // Get the start time range of the bucket for the provided time.
 // The actual time span is: [start, end + in.bucketTimeLength)
+// 根据提供的时间获取桶的时间范围
+// 实际时间跨度为:[start, end + in.bucketTimeLength] todo
 func (m *SlidingWindowMetric) getBucketStartRange(timeMs uint64) (start, end uint64) {
 	curBucketStartTime := calculateStartTime(timeMs, m.real.BucketLengthInMs())
 	end = curBucketStartTime
@@ -62,10 +69,12 @@ func (m *SlidingWindowMetric) getBucketStartRange(timeMs uint64) (start, end uin
 	return
 }
 
+// 每个桶的毫秒时间转换成秒
 func (m *SlidingWindowMetric) getIntervalInSecond() float64 {
 	return float64(m.intervalInMs) / 1000.0
 }
 
+// 根据事件类型 从bucket中计算总值
 func (m *SlidingWindowMetric) count(event base.MetricEvent, values []*BucketWrap) int64 {
 	ret := int64(0)
 	for _, ww := range values {
@@ -79,20 +88,23 @@ func (m *SlidingWindowMetric) count(event base.MetricEvent, values []*BucketWrap
 			logging.Error(errors.New("type assert failed"), "Fail to do type assert in SlidingWindowMetric.count()", "expectType", "*MetricBucket", "actualType", reflect.TypeOf(mb).Name())
 			continue
 		}
-		ret += counter.Get(event)
+		ret += counter.Get(event) // 累加
 	}
 	return ret
 }
 
+// GetSum 获取当前时间的统计值
 func (m *SlidingWindowMetric) GetSum(event base.MetricEvent) int64 {
 	return m.getSumWithTime(util.CurrentTimeMillis(), event)
 }
 
+// 获取指定时间点的统计值
 func (m *SlidingWindowMetric) getSumWithTime(now uint64, event base.MetricEvent) int64 {
 	satisfiedBuckets := m.getSatisfiedBuckets(now)
 	return m.count(event, satisfiedBuckets)
 }
 
+// GetQPS 获取当前时间的qps
 func (m *SlidingWindowMetric) GetQPS(event base.MetricEvent) float64 {
 	return m.getQPSWithTime(util.CurrentTimeMillis(), event)
 }
@@ -101,18 +113,21 @@ func (m *SlidingWindowMetric) GetPreviousQPS(event base.MetricEvent) float64 {
 	return m.getQPSWithTime(util.CurrentTimeMillis()-uint64(m.bucketLengthInMs), event)
 }
 
+// 获取指定开始时间的qps
 func (m *SlidingWindowMetric) getQPSWithTime(now uint64, event base.MetricEvent) float64 {
 	return float64(m.getSumWithTime(now, event)) / m.getIntervalInSecond()
 }
 
+// 刷选当前时间点的对应的bucket
 func (m *SlidingWindowMetric) getSatisfiedBuckets(now uint64) []*BucketWrap {
-	start, end := m.getBucketStartRange(now)
+	start, end := m.getBucketStartRange(now) // 获取bucket的时间范围
 	satisfiedBuckets := m.real.ValuesConditional(now, func(ws uint64) bool {
 		return ws >= start && ws <= end
 	})
 	return satisfiedBuckets
 }
 
+// GetMaxOfSingleBucket 当前时间点中所有bucket中取最大的event值
 func (m *SlidingWindowMetric) GetMaxOfSingleBucket(event base.MetricEvent) int64 {
 	now := util.CurrentTimeMillis()
 	satisfiedBuckets := m.getSatisfiedBuckets(now)
@@ -136,6 +151,7 @@ func (m *SlidingWindowMetric) GetMaxOfSingleBucket(event base.MetricEvent) int64
 	return curMax
 }
 
+// MinRT 最低的rt
 func (m *SlidingWindowMetric) MinRT() float64 {
 	now := util.CurrentTimeMillis()
 	satisfiedBuckets := m.getSatisfiedBuckets(now)

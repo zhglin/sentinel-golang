@@ -36,7 +36,7 @@ func BuildDefaultSlotChain() *base.SlotChain {
 	sc := base.NewSlotChain()
 	sc.AddStatPrepareSlot(stat.DefaultResourceNodePrepareSlot)
 
-	sc.AddRuleCheckSlot(system.DefaultAdaptiveSlot)
+	sc.AddRuleCheckSlot(system.DefaultAdaptiveSlot) // 系统自适应保护的校验
 	sc.AddRuleCheckSlot(flow.DefaultSlot)
 	sc.AddRuleCheckSlot(isolation.DefaultSlot)
 	sc.AddRuleCheckSlot(hotspot.DefaultSlot)

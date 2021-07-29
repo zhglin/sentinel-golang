@@ -204,6 +204,7 @@ func (sc *SlotChain) Entry(ctx *EntryContext) *TokenResult {
 	}()
 
 	// execute prepare slot
+	// 执行预处理slot
 	sps := sc.statPres
 	if len(sps) > 0 {
 		for _, s := range sps {
@@ -212,6 +213,7 @@ func (sc *SlotChain) Entry(ctx *EntryContext) *TokenResult {
 	}
 
 	// execute rule based checking slot
+	// 执行规则校验slot
 	rcs := sc.ruleChecks
 	var ruleCheckRet *TokenResult
 	if len(rcs) > 0 {

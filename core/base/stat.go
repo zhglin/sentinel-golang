@@ -33,7 +33,8 @@ const (
 	MetricEventComplete
 	// Biz error, used for circuit breaker
 	MetricEventError
-	// request execute rt, unit is millisecond
+	// MetricEventRt request execute rt, unit is millisecond
+	// 请求执行rt，单位为毫秒
 	MetricEventRt
 	// hack for the number of event
 	MetricEventTotal

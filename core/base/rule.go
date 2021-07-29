@@ -16,6 +16,7 @@ package base
 
 import "fmt"
 
+// SentinelRule 所有rule的统一接口
 type SentinelRule interface {
 	fmt.Stringer
 
