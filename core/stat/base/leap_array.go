@@ -81,9 +81,8 @@ func NewAtomicBucketWrapArrayWithTime(len int, bucketLengthInMs uint32, now uint
 		data:   make([]*BucketWrap, len),
 	}
 
-	timeId := now / uint64(bucketLengthInMs)               // 当前时间点对应的第几个bucket
-	idx := int(timeId) % len                               // 当前时间在data中的下标
-	startTime := calculateStartTime(now, bucketLengthInMs) // 重新计算当前时间
+	idx := int((now / uint64(bucketLengthInMs)) % uint64(len)) // 当前时间在data中的下标
+	startTime := calculateStartTime(now, bucketLengthInMs)     // 重新计算当前时间
 
 	// 初始化idx之后的data
 	for i := idx; i <= len-1; i++ {
