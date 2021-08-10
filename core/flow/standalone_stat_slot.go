@@ -35,11 +35,12 @@ func (s *StandaloneStatSlot) Order() uint32 {
 	return StatSlotOrder
 }
 
+// OnEntryPassed 流量控制数据统计
 func (s StandaloneStatSlot) OnEntryPassed(ctx *base.EntryContext) {
 	res := ctx.Resource.Name()
 	for _, tc := range getTrafficControllerListFor(res) {
 		if !tc.boundStat.reuseResourceStat {
-			if tc.boundStat.writeOnlyMetric != nil {
+			if tc.boundStat.writeOnlyMetric != nil { // 数据更新
 				tc.boundStat.writeOnlyMetric.AddCount(base.MetricEventPass, int64(ctx.Input.BatchCount))
 			} else {
 				logging.Error(errors.New("nil independent write statistic"), "Nil statistic for traffic control in StandaloneStatSlot.OnEntryPassed()", "rule", tc.rule)

@@ -20,9 +20,10 @@ import (
 
 type DirectTrafficShapingCalculator struct {
 	owner     *TrafficShapingController
-	threshold float64
+	threshold float64 // 阀值
 }
 
+// NewDirectTrafficShapingCalculator 直接流量整形计算器
 func NewDirectTrafficShapingCalculator(owner *TrafficShapingController, threshold float64) *DirectTrafficShapingCalculator {
 	return &DirectTrafficShapingCalculator{
 		owner:     owner,
@@ -38,11 +39,13 @@ func (d *DirectTrafficShapingCalculator) BoundOwner() *TrafficShapingController 
 	return d.owner
 }
 
+// RejectTrafficShapingChecker 阀值校验
 type RejectTrafficShapingChecker struct {
 	owner *TrafficShapingController
 	rule  *Rule
 }
 
+// NewRejectTrafficShapingChecker 根据指定的rule TrafficShapingController创建
 func NewRejectTrafficShapingChecker(owner *TrafficShapingController, rule *Rule) *RejectTrafficShapingChecker {
 	return &RejectTrafficShapingChecker{
 		owner: owner,
@@ -54,11 +57,14 @@ func (d *RejectTrafficShapingChecker) BoundOwner() *TrafficShapingController {
 	return d.owner
 }
 
+// DoCheck 超过直接拒绝
 func (d *RejectTrafficShapingChecker) DoCheck(resStat base.StatNode, batchCount uint32, threshold float64) *base.TokenResult {
 	metricReadonlyStat := d.BoundOwner().boundStat.readOnlyMetric
 	if metricReadonlyStat == nil {
 		return nil
 	}
+
+	// 当前时间的pass数量 + 此次申请的数量
 	curCount := float64(metricReadonlyStat.GetSum(base.MetricEventPass))
 	if curCount+float64(batchCount) > threshold {
 		msg := "flow reject check blocked"

@@ -34,10 +34,11 @@ func (s *Slot) Order() uint32 {
 	return StatSlotOrder
 }
 
+// OnEntryPassed 对全局统计进行更新
 func (s *Slot) OnEntryPassed(ctx *base.EntryContext) {
-	s.recordPassFor(ctx.StatNode, ctx.Input.BatchCount)
+	s.recordPassFor(ctx.StatNode, ctx.Input.BatchCount) // 增加resource全局统计
 	if ctx.Resource.FlowType() == base.Inbound {
-		s.recordPassFor(InboundNode(), ctx.Input.BatchCount)
+		s.recordPassFor(InboundNode(), ctx.Input.BatchCount) // 增加系统统计
 	}
 }
 
@@ -50,19 +51,20 @@ func (s *Slot) OnEntryBlocked(ctx *base.EntryContext, blockError *base.BlockErro
 
 func (s *Slot) OnCompleted(ctx *base.EntryContext) {
 	rt := util.CurrentTimeMillis() - ctx.StartTime()
-	ctx.PutRt(rt)
+	ctx.PutRt(rt) // 计算并设置响应时间
 	s.recordCompleteFor(ctx.StatNode, ctx.Input.BatchCount, rt, ctx.Err())
 	if ctx.Resource.FlowType() == base.Inbound {
 		s.recordCompleteFor(InboundNode(), ctx.Input.BatchCount, rt, ctx.Err())
 	}
 }
 
+// 增加计数
 func (s *Slot) recordPassFor(sn base.StatNode, count uint32) {
 	if sn == nil {
 		return
 	}
-	sn.IncreaseConcurrency()
-	sn.AddCount(base.MetricEventPass, int64(count))
+	sn.IncreaseConcurrency()                        // 请求数
+	sn.AddCount(base.MetricEventPass, int64(count)) // 资源数
 }
 
 func (s *Slot) recordBlockFor(sn base.StatNode, count uint32) {

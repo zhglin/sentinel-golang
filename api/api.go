@@ -38,7 +38,7 @@ var entryOptsPool = sync.Pool{
 type EntryOptions struct {
 	resourceType base.ResourceType // 资源分类
 	entryType    base.TrafficType  // 流量类型
-	batchCount   uint32
+	batchCount   uint32            // 一次批量获取的资源数 默认1
 	flag         int32
 	slotChain    *base.SlotChain
 	args         []interface{}

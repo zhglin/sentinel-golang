@@ -30,7 +30,7 @@ type MetricBucket struct {
 	// Value of statistic
 	counter        [base.MetricEventTotal]int64 // 六种类型的不同统计值 不同类型对应不同下标
 	minRt          int64                        // 最低的rt
-	maxConcurrency int32
+	maxConcurrency int32                        // 一次申请的最大资源数
 }
 
 func NewMetricBucket() *MetricBucket {
@@ -42,6 +42,7 @@ func NewMetricBucket() *MetricBucket {
 }
 
 // Add statistic count for the given metric event.
+// 添加给定度量事件的统计计数。
 func (mb *MetricBucket) Add(event base.MetricEvent, count int64) {
 	if event >= base.MetricEventTotal || event < 0 {
 		logging.Error(errors.Errorf("Unknown metric event: %v", event), "")
@@ -54,6 +55,7 @@ func (mb *MetricBucket) Add(event base.MetricEvent, count int64) {
 	mb.addCount(event, count)
 }
 
+// 根据时间类型，添加数量，增量添加计数
 func (mb *MetricBucket) addCount(event base.MetricEvent, count int64) {
 	atomic.AddInt64(&mb.counter[event], count)
 }
@@ -76,10 +78,11 @@ func (mb *MetricBucket) reset() {
 	atomic.StoreInt32(&mb.maxConcurrency, int32(0))
 }
 
+// AddRt 增加响应时间
 func (mb *MetricBucket) AddRt(rt int64) {
 	mb.addCount(base.MetricEventRt, rt)
 	if rt < atomic.LoadInt64(&mb.minRt) {
-		// Might not be accurate here.
+		// Might not be accurate here. 这里可能不准确。并发
 		atomic.StoreInt64(&mb.minRt, rt)
 	}
 }
@@ -88,10 +91,11 @@ func (mb *MetricBucket) MinRt() int64 {
 	return atomic.LoadInt64(&mb.minRt)
 }
 
+// UpdateConcurrency 更新成最大的一次申请资源数量
 func (mb *MetricBucket) UpdateConcurrency(concurrency int32) {
 	cc := concurrency
 	if cc > atomic.LoadInt32(&mb.maxConcurrency) {
-		// Might not be accurate here.
+		// Might not be accurate here. 这里可能不准确。
 		atomic.StoreInt32(&mb.maxConcurrency, cc)
 	}
 }

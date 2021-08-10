@@ -34,17 +34,17 @@ func GlobalSlotChain() *base.SlotChain {
 // BuildDefaultSlotChain 对各个函数链添加对应的处理函数
 func BuildDefaultSlotChain() *base.SlotChain {
 	sc := base.NewSlotChain()
-	sc.AddStatPrepareSlot(stat.DefaultResourceNodePrepareSlot)
+	sc.AddStatPrepareSlot(stat.DefaultResourceNodePrepareSlot) // 为每个resourceName创建全局统计信息
 
 	sc.AddRuleCheckSlot(system.DefaultAdaptiveSlot) // 系统自适应保护的校验
-	sc.AddRuleCheckSlot(flow.DefaultSlot)
+	sc.AddRuleCheckSlot(flow.DefaultSlot)           // 流量控制校验
 	sc.AddRuleCheckSlot(isolation.DefaultSlot)
 	sc.AddRuleCheckSlot(hotspot.DefaultSlot)
 	sc.AddRuleCheckSlot(circuitbreaker.DefaultSlot)
 
-	sc.AddStatSlot(stat.DefaultSlot)
+	sc.AddStatSlot(stat.DefaultSlot) // resourceName的全局统计信息更改
 	sc.AddStatSlot(log.DefaultSlot)
-	sc.AddStatSlot(flow.DefaultStandaloneStatSlot)
+	sc.AddStatSlot(flow.DefaultStandaloneStatSlot) // 流量控制更新
 	sc.AddStatSlot(hotspot.DefaultConcurrencyStatSlot)
 	sc.AddStatSlot(circuitbreaker.DefaultMetricStatSlot)
 	return sc

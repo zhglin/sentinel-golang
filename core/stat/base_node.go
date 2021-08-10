@@ -26,7 +26,7 @@ type BaseStatNode struct {
 	sampleCount uint32
 	intervalMs  uint32
 
-	concurrency int32
+	concurrency int32 // 获取到资源的请求数
 
 	arr    *sbase.BucketLeapArray     // 数据的写入
 	metric *sbase.SlidingWindowMetric // arr的读取以及统计计算
@@ -34,6 +34,8 @@ type BaseStatNode struct {
 
 // NewBaseStatNode
 // sampleCount=config.MetricStatisticSampleCount(), intervalInMs=config.MetricStatisticIntervalMs()
+// 这里是根据配置文件生成的每个resourceName的全局统计信息
+// la,metric读写分开，利于重用
 func NewBaseStatNode(sampleCount uint32, intervalInMs uint32) *BaseStatNode {
 	la := sbase.NewBucketLeapArray(config.GlobalStatisticSampleCountTotal(), config.GlobalStatisticIntervalMsTotal())
 	metric, _ := sbase.NewSlidingWindowMetric(sampleCount, intervalInMs, la)
@@ -41,8 +43,8 @@ func NewBaseStatNode(sampleCount uint32, intervalInMs uint32) *BaseStatNode {
 		concurrency: 0,
 		sampleCount: sampleCount,
 		intervalMs:  intervalInMs,
-		arr:         la,
-		metric:      metric,
+		arr:         la,     // 写入
+		metric:      metric, // 读取
 	}
 }
 
@@ -93,23 +95,27 @@ func (n *BaseStatNode) MaxConcurrency() int32 {
 	return n.metric.MaxConcurrency()
 }
 
-// CurrentConcurrency 获取并发数
+// CurrentConcurrency 获取请求数
 func (n *BaseStatNode) CurrentConcurrency() int32 {
 	return atomic.LoadInt32(&(n.concurrency))
 }
 
+// IncreaseConcurrency 增加获取到资源的请求数   获取到资源加+1
 func (n *BaseStatNode) IncreaseConcurrency() {
 	n.UpdateConcurrency(atomic.AddInt32(&(n.concurrency), 1))
 }
 
+// DecreaseConcurrency 资源用完减-1
 func (n *BaseStatNode) DecreaseConcurrency() {
 	atomic.AddInt32(&(n.concurrency), -1)
 }
 
+// GenerateReadStat 重用arr 重新生成NewSlidingWindowMetric
 func (n *BaseStatNode) GenerateReadStat(sampleCount uint32, intervalInMs uint32) (base.ReadStat, error) {
 	return sbase.NewSlidingWindowMetric(sampleCount, intervalInMs, n.arr)
 }
 
+// DefaultMetric 返回metric 重用NewSlidingWindowMetric
 func (n *BaseStatNode) DefaultMetric() base.ReadStat {
 	return n.metric
 }

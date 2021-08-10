@@ -21,7 +21,7 @@ import (
 	"github.com/alibaba/sentinel-golang/logging"
 )
 
-type ResourceNodeMap map[string]*ResourceNode
+type ResourceNodeMap map[string]*ResourceNode // resourceName => resourceNode
 
 var (
 	inboundNode = NewResourceNode(base.TotalInBoundResourceName, base.ResTypeCommon)
@@ -31,7 +31,7 @@ var (
 )
 
 // InboundNode returns the global inbound statistic node.
-// 返回全局入站统计节点。
+// 返回全局入站统计节点。 系统自适应保护使用
 func InboundNode() *ResourceNode {
 	return inboundNode
 }

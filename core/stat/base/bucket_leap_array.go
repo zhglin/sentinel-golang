@@ -39,6 +39,7 @@ func (bla *BucketLeapArray) NewEmptyBucket() interface{} {
 	return NewMetricBucket()
 }
 
+// ResetBucketTo 重置bucketWrap的信息
 func (bla *BucketLeapArray) ResetBucketTo(bw *BucketWrap, startTime uint64) *BucketWrap {
 	atomic.StoreUint64(&bw.BucketStart, startTime)
 	bw.Value.Store(NewMetricBucket())
@@ -89,12 +90,14 @@ func (bla *BucketLeapArray) GetIntervalInSecond() float64 {
 	return float64(bla.IntervalInMs()) / 1000.0
 }
 
-// Write method
+// AddCount Write method
 // It might panic
+// 写方法 它可能会恐慌
 func (bla *BucketLeapArray) AddCount(event base.MetricEvent, count int64) {
 	bla.addCountWithTime(util.CurrentTimeMillis(), event, count)
 }
 
+// 增加数量 增量增加
 func (bla *BucketLeapArray) addCountWithTime(now uint64, event base.MetricEvent, count int64) {
 	b := bla.currentBucketWithTime(now)
 	if b == nil {
@@ -115,6 +118,7 @@ func (bla *BucketLeapArray) updateConcurrencyWithTime(now uint64, concurrency in
 	b.UpdateConcurrency(concurrency)
 }
 
+// 指定的now时间对应的bucket
 func (bla *BucketLeapArray) currentBucketWithTime(now uint64) *MetricBucket {
 	curBucket, err := bla.data.currentBucketOfTime(now, bla)
 	if err != nil {

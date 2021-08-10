@@ -151,6 +151,7 @@ func (aa *AtomicBucketWrapArray) compareAndSet(idx int, except, update *BucketWr
 	// aa.elementOffset(idx) return the secondary pointer of BucketWrap, which is the pointer to the aa.data[idx]
 	// then convert to (*unsafe.Pointer)
 	// update secondary pointer
+	// aa.elementoffset(idx)返回BucketWrap的第二个指针，即指向aa.data[idx]，然后转换为(*unsafe.Pointer)进行更新
 	if offset, ok := aa.elementOffset(idx); ok {
 		return atomic.CompareAndSwapPointer((*unsafe.Pointer)(offset), unsafe.Pointer(except), unsafe.Pointer(update))
 	}
@@ -197,19 +198,22 @@ func (la *LeapArray) CurrentBucket(bg BucketGenerator) (*BucketWrap, error) {
 	return la.currentBucketOfTime(util.CurrentTimeMillis(), bg)
 }
 
+// 获取指定时间对应的bucketWrap
 func (la *LeapArray) currentBucketOfTime(now uint64, bg BucketGenerator) (*BucketWrap, error) {
 	if now <= 0 {
 		return nil, errors.New("Current time is less than 0.")
 	}
 
 	idx := la.calculateTimeIdx(now)
-	bucketStart := calculateStartTime(now, la.bucketLengthInMs)
+	bucketStart := calculateStartTime(now, la.bucketLengthInMs) // 重置时间
 
-	for { //spin to get the current BucketWrap
+	// 这里是循环
+	for { //spin to get the current BucketWrap 旋转得到当前的bucketWrap
 		old := la.array.get(idx)
 		if old == nil {
 			// because la.array.data had initiated when new la.array
 			// theoretically, here is not reachable
+			// la.array.data在new la.array之后就已经创建了，从理论上讲这里无法到达
 			newWrap := &BucketWrap{
 				BucketStart: bucketStart,
 				Value:       atomic.Value{},
@@ -218,13 +222,15 @@ func (la *LeapArray) currentBucketOfTime(now uint64, bg BucketGenerator) (*Bucke
 			if la.array.compareAndSet(idx, nil, newWrap) {
 				return newWrap, nil
 			} else {
-				runtime.Gosched()
+				runtime.Gosched() // 让出cpu，循环重试
 			}
 		} else if bucketStart == atomic.LoadUint64(&old.BucketStart) {
+			// now刚好是idx
 			return old, nil
 		} else if bucketStart > atomic.LoadUint64(&old.BucketStart) {
 			// current time has been next cycle of LeapArray and LeapArray dont't count in last cycle.
 			// reset BucketWrap
+			// 当前时间已经是LeapArray的下一个周期，LeapArray不计入上一个周期。重置BucketWrap
 			if la.updateLock.TryLock() {
 				old = bg.ResetBucketTo(old, bucketStart)
 				la.updateLock.Unlock()
@@ -232,23 +238,26 @@ func (la *LeapArray) currentBucketOfTime(now uint64, bg BucketGenerator) (*Bucke
 			} else {
 				runtime.Gosched()
 			}
-		} else if bucketStart < atomic.LoadUint64(&old.BucketStart) {
+		} else if bucketStart < atomic.LoadUint64(&old.BucketStart) { // 过期了
 			if la.sampleCount == 1 {
 				// if sampleCount==1 in leap array, in concurrency scenario, this case is possible
 				return old, nil
 			}
 			// TODO: reserve for some special case (e.g. when occupying "future" buckets).
+			// 保留一些特殊情况(例如，当占用“未来”桶)。
 			return nil, errors.New(fmt.Sprintf("Provided time timeMillis=%d is already behind old.BucketStart=%d.", bucketStart, old.BucketStart))
 		}
 	}
 }
 
+// 计算指定的now时间对应的bucket下标
 func (la *LeapArray) calculateTimeIdx(now uint64) int {
-	timeId := now / uint64(la.bucketLengthInMs)
+	timeId := now / uint64(la.bucketLengthInMs) // 纳秒转毫秒  丢掉了纳秒
 	return int(timeId) % la.array.length
 }
 
-//  Get all BucketWrap between [current time - leap array interval, current time]
+// Values Get all BucketWrap between [current time - leap array interval, current time]
+// 获取整个窗口的bucketWarp
 func (la *LeapArray) Values() []*BucketWrap {
 	return la.valuesWithTime(util.CurrentTimeMillis())
 }
@@ -288,7 +297,7 @@ func (la *LeapArray) ValuesConditional(now uint64, predicate base.TimePredicate)
 // 判断BucketWrap是否过期 是否在窗口内
 func (la *LeapArray) isBucketDeprecated(now uint64, ww *BucketWrap) bool {
 	ws := atomic.LoadUint64(&ww.BucketStart)
-	return (now - ws) > uint64(la.intervalInMs)
+	return (now - ws) > uint64(la.intervalInMs) // 超过了bucket的时间 无效
 }
 
 // BucketGenerator Generic interface to generate bucket
@@ -299,6 +308,6 @@ type BucketGenerator interface {
 	NewEmptyBucket() interface{}
 
 	// ResetBucketTo reset the BucketWrap, clear all data of BucketWrap
-	// 重置BucketWrap，清除所有BucketWrap数据
+	// 重置BucketWrap，清除bw的数据
 	ResetBucketTo(bw *BucketWrap, startTime uint64) *BucketWrap
 }

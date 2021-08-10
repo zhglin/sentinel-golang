@@ -39,7 +39,7 @@ func (s *Slot) Order() uint32 {
 
 func (s *Slot) Check(ctx *base.EntryContext) *base.TokenResult {
 	res := ctx.Resource.Name()
-	tcs := getTrafficControllerListFor(res)
+	tcs := getTrafficControllerListFor(res) // resourceName的流量控制器
 	result := ctx.RuleCheckResult
 
 	// Check rules in order
@@ -67,6 +67,7 @@ func (s *Slot) Check(ctx *base.EntryContext) *base.TokenResult {
 	return result
 }
 
+// 是否超过流量配置
 func canPassCheck(tc *TrafficShapingController, node base.StatNode, batchCount uint32) *base.TokenResult {
 	return canPassCheckWithFlag(tc, node, batchCount, 0)
 }
@@ -75,6 +76,7 @@ func canPassCheckWithFlag(tc *TrafficShapingController, node base.StatNode, batc
 	return checkInLocal(tc, node, batchCount, flag)
 }
 
+// 关联的resource
 func selectNodeByRelStrategy(rule *Rule, node base.StatNode) base.StatNode {
 	if rule.RelationStrategy == AssociatedResource {
 		return stat.GetResourceNode(rule.RefResource)
@@ -82,6 +84,7 @@ func selectNodeByRelStrategy(rule *Rule, node base.StatNode) base.StatNode {
 	return node
 }
 
+// 校验
 func checkInLocal(tc *TrafficShapingController, resStat base.StatNode, batchCount uint32, flag int32) *base.TokenResult {
 	actual := selectNodeByRelStrategy(tc.rule, resStat)
 	if actual == nil {

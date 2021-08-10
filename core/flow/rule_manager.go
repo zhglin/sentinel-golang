@@ -30,11 +30,13 @@ import (
 )
 
 // TrafficControllerGenFunc represents the TrafficShapingController generator function of a specific control behavior.
+// 表示特定控制行为的TrafficShapingController生成器函数。
 type TrafficControllerGenFunc func(*Rule, *standaloneStatistic) (*TrafficShapingController, error)
 
+// 流量控制的条件
 type trafficControllerGenKey struct {
-	tokenCalculateStrategy TokenCalculateStrategy
-	controlBehavior        ControlBehavior
+	tokenCalculateStrategy TokenCalculateStrategy // 计算阀值
+	controlBehavior        ControlBehavior        // 超过阀值后的行为
 }
 
 // TrafficControllerMap represents the map storage for TrafficShapingController.
@@ -42,19 +44,22 @@ type TrafficControllerMap map[string][]*TrafficShapingController
 
 var (
 	tcGenFuncMap = make(map[trafficControllerGenKey]TrafficControllerGenFunc, 4)
-	tcMap        = make(TrafficControllerMap)
+	tcMap        = make(TrafficControllerMap) // 当前使用的rules对应的TrafficShapingController
 	tcMux        = new(sync.RWMutex)
 	nopStat      = &standaloneStatistic{
 		reuseResourceStat: false,
 		readOnlyMetric:    base.NopReadStat(),
 		writeOnlyMetric:   base.NopWriteStat(),
 	}
-	currentRules  = make(map[string][]*Rule, 0)
+	currentRules  = make(map[string][]*Rule, 0) // 当前使用的rules  resourceName=>rule
 	updateRuleMux = new(sync.Mutex)
 )
 
 func init() {
 	// Initialize the traffic shaping controller generator map for existing control behaviors.
+	// 为现有的控制行为初始化流量整形控制器生成器映射。
+	// 根据tokenCalculateStrategy，controlBehavior的组合，创建对应的控制器
+	// 直接使用threshold值，超过拒绝
 	tcGenFuncMap[trafficControllerGenKey{
 		tokenCalculateStrategy: Direct,
 		controlBehavior:        Reject,
@@ -70,10 +75,12 @@ func init() {
 		if err != nil || tsc == nil {
 			return nil, err
 		}
-		tsc.flowCalculator = NewDirectTrafficShapingCalculator(tsc, rule.Threshold)
-		tsc.flowChecker = NewRejectTrafficShapingChecker(tsc, rule)
+		tsc.flowCalculator = NewDirectTrafficShapingCalculator(tsc, rule.Threshold) // 直接流量整形计算器
+		tsc.flowChecker = NewRejectTrafficShapingChecker(tsc, rule)                 // 拒绝流量整形检查程序
 		return tsc, nil
 	}
+
+	// 直接使用threshold值，一次请求资源数超过拒绝，未超过返回wait时间
 	tcGenFuncMap[trafficControllerGenKey{
 		tokenCalculateStrategy: Direct,
 		controlBehavior:        Throttling,
@@ -159,6 +166,7 @@ func init() {
 	}
 }
 
+// 记录当前rule的日志
 func logRuleUpdate(m map[string][]*Rule) {
 	rules := make([]*Rule, 0, 8)
 	for _, rs := range m {
@@ -174,6 +182,7 @@ func logRuleUpdate(m map[string][]*Rule) {
 	}
 }
 
+// 生效新的rule
 func onRuleUpdate(rawResRulesMap map[string][]*Rule) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -186,6 +195,7 @@ func onRuleUpdate(rawResRulesMap map[string][]*Rule) (err error) {
 	}()
 
 	// ignore invalid rules
+	// 忽略无效的规则
 	validResRulesMap := make(map[string][]*Rule, len(rawResRulesMap))
 	for res, rules := range rawResRulesMap {
 		validResRules := make([]*Rule, 0, len(rules))
@@ -203,6 +213,7 @@ func onRuleUpdate(rawResRulesMap map[string][]*Rule) (err error) {
 
 	start := util.CurrentTimeNano()
 
+	// 复制旧值
 	tcMux.RLock()
 	tcMapClone := make(TrafficControllerMap, len(validResRulesMap))
 	for res, tcs := range tcMap {
@@ -212,6 +223,7 @@ func onRuleUpdate(rawResRulesMap map[string][]*Rule) (err error) {
 	}
 	tcMux.RUnlock()
 
+	// 生成TrafficShapingController控制器
 	m := make(TrafficControllerMap, len(validResRulesMap))
 	for res, rulesOfRes := range validResRulesMap {
 		newTcsOfRes := buildResourceTrafficShapingController(res, rulesOfRes, tcMapClone[res])
@@ -225,6 +237,7 @@ func onRuleUpdate(rawResRulesMap map[string][]*Rule) (err error) {
 	tcMux.Unlock()
 	currentRules = rawResRulesMap
 
+	// 记录日志
 	logging.Debug("[Flow onRuleUpdate] Time statistic(ns) for updating flow rule", "timeCost", util.CurrentTimeNano()-start)
 	logRuleUpdate(validResRulesMap)
 	return nil
@@ -232,10 +245,12 @@ func onRuleUpdate(rawResRulesMap map[string][]*Rule) (err error) {
 
 // LoadRules loads the given flow rules to the rule manager, while all previous rules will be replaced.
 // the first returned value indicates whether do real load operation, if the rules is the same with previous rules, return false
+// 将给定的流规则加载到规则管理器，而之前的所有规则将被替换。
+// 第一个返回值指示是否进行实际加载操作，如果规则与前面的规则相同，则返回false
 func LoadRules(rules []*Rule) (bool, error) {
 	resRulesMap := make(map[string][]*Rule, 16)
 	for _, rule := range rules {
-		resRules, exist := resRulesMap[rule.Resource]
+		resRules, exist := resRulesMap[rule.Resource] // 重复资源名
 		if !exist {
 			resRules = make([]*Rule, 0, 1)
 		}
@@ -244,15 +259,16 @@ func LoadRules(rules []*Rule) (bool, error) {
 
 	updateRuleMux.Lock()
 	defer updateRuleMux.Unlock()
-	isEqual := reflect.DeepEqual(currentRules, resRulesMap)
+	isEqual := reflect.DeepEqual(currentRules, resRulesMap) // 新旧对比
 	if isEqual {
 		logging.Info("[Flow] Load rules is the same with current rules, so ignore load operation.")
 		return false, nil
 	}
-	err := onRuleUpdate(resRulesMap)
+	err := onRuleUpdate(resRulesMap) // 更新
 	return true, err
 }
 
+// 更新制定的resourceName的rule
 func onResourceRuleUpdate(res string, rawResRules []*Rule) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -295,13 +311,15 @@ func onResourceRuleUpdate(res string, rawResRules []*Rule) (err error) {
 
 // LoadRulesOfResource loads the given resource's flow rules to the rule manager, while all previous resource's rules will be replaced.
 // the first returned value indicates whether do real load operation, if the rules is the same with previous resource's rules, return false
+// LoadRulesOfResource将给定资源的流规则加载到规则管理器，而之前所有资源的规则将被替换。
+// 第一个返回值指示是否进行实际加载操作，如果规则与前一个资源的规则相同，则返回false
 func LoadRulesOfResource(res string, rules []*Rule) (bool, error) {
 	if len(res) == 0 {
 		return false, errors.New("empty resource")
 	}
 	updateRuleMux.Lock()
 	defer updateRuleMux.Unlock()
-	// clear resource rules
+	// clear resource rules 清空
 	if len(rules) == 0 {
 		// clear resource's currentRules
 		delete(currentRules, res)
@@ -312,7 +330,7 @@ func LoadRulesOfResource(res string, rules []*Rule) (bool, error) {
 		logging.Info("[Flow] clear resource level rules", "resource", res)
 		return true, nil
 	}
-	// load resource level rules
+	// load resource level rules 校验是否相等
 	isEqual := reflect.DeepEqual(currentRules[res], rules)
 	if isEqual {
 		logging.Info("[Flow] Load resource level rules is the same with current resource level rules, so ignore load operation.")
@@ -325,6 +343,8 @@ func LoadRulesOfResource(res string, rules []*Rule) (bool, error) {
 
 // getRules returns all the rules。Any changes of rules take effect for flow module
 // getRules is an internal interface.
+// getRules返回所有规则。规则的任何更改都对流程模块生效
+// getRules是一个内部接口。
 func getRules() []*Rule {
 	tcMux.RLock()
 	defer tcMux.RUnlock()
@@ -334,6 +354,8 @@ func getRules() []*Rule {
 
 // getRulesOfResource returns specific resource's rules。Any changes of rules take effect for flow module
 // getRulesOfResource is an internal interface.
+// 返回特定资源的规则。规则的任何更改都对流程模块生效
+// getRulesOfResource是一个内部接口。
 func getRulesOfResource(res string) []*Rule {
 	tcMux.RLock()
 	defer tcMux.RUnlock()
@@ -351,6 +373,8 @@ func getRulesOfResource(res string) []*Rule {
 
 // GetRules returns all the rules based on copy.
 // It doesn't take effect for flow module if user changes the rule.
+// GetRules返回所有基于copy的规则。
+// 如果用户改变了规则，它不会对流模块生效。
 func GetRules() []Rule {
 	rules := getRules()
 	ret := make([]Rule, 0, len(rules))
@@ -362,6 +386,8 @@ func GetRules() []Rule {
 
 // GetRulesOfResource returns specific resource's rules based on copy.
 // It doesn't take effect for flow module if user changes the rule.
+// GetRulesOfResource返回基于复制的制定resourceName的规则。
+// 如果用户改变了规则，它不会对流模块生效。
 func GetRulesOfResource(res string) []Rule {
 	rules := getRulesOfResource(res)
 	ret := make([]Rule, 0, len(rules))
@@ -372,17 +398,20 @@ func GetRulesOfResource(res string) []Rule {
 }
 
 // ClearRules clears all the rules in flow module.
+// 清空所有rule
 func ClearRules() error {
 	_, err := LoadRules(nil)
 	return err
 }
 
 // ClearRulesOfResource clears resource level rules in flow module.
+// 清除流模块中的自定的resourceName的资源规则。
 func ClearRulesOfResource(res string) error {
 	_, err := LoadRulesOfResource(res, nil)
 	return err
 }
 
+// 从TrafficControllerMap中获取rule
 func rulesFrom(m TrafficControllerMap) []*Rule {
 	rules := make([]*Rule, 0, 8)
 	if len(m) == 0 {
@@ -401,24 +430,30 @@ func rulesFrom(m TrafficControllerMap) []*Rule {
 	return rules
 }
 
+// 生成rule的统计信息
 func generateStatFor(rule *Rule) (*standaloneStatistic, error) {
+	// 不需要单独统计
 	if !rule.needStatistic() {
 		return nopStat, nil
 	}
 
+	// 时间窗口
 	intervalInMs := rule.StatIntervalInMs
 
 	var retStat standaloneStatistic
 
+	// 重复使用相同resourceName的ResourceNode
 	var resNode *stat.ResourceNode
 	if rule.RelationStrategy == AssociatedResource {
-		// use associated statistic
+		// use associated statistic 使用相关的统计
 		resNode = stat.GetOrCreateResourceNode(rule.RefResource, base.ResTypeCommon)
 	} else {
 		resNode = stat.GetOrCreateResourceNode(rule.Resource, base.ResTypeCommon)
 	}
 	if intervalInMs == 0 || intervalInMs == config.MetricStatisticIntervalMs() {
 		// default case, use the resource's default statistic
+		// 默认情况下，使用资源的默认统计
+		// MetricStatisticIntervalMs配置
 		readStat := resNode.DefaultMetric()
 		retStat.reuseResourceStat = true
 		retStat.readOnlyMetric = readStat
@@ -426,6 +461,8 @@ func generateStatFor(rule *Rule) (*standaloneStatistic, error) {
 		return &retStat, nil
 	}
 
+	// 不使用配置的默认时长 重新计算校验sampleCount
+	// 相同的resource因为intervalInMs不同 使用不同的retStat
 	sampleCount := uint32(0)
 	//calculate the sample count
 	if intervalInMs > config.GlobalStatisticIntervalMsTotal() {
@@ -442,6 +479,8 @@ func generateStatFor(rule *Rule) (*standaloneStatistic, error) {
 	err := base.CheckValidityForReuseStatistic(sampleCount, intervalInMs, config.GlobalStatisticSampleCountTotal(), config.GlobalStatisticIntervalMsTotal())
 	if err == nil {
 		// global statistic reusable
+		// 能公用global的统计
+		// GlobalStatisticIntervalMsTotal配置
 		readStat, e := resNode.GenerateReadStat(sampleCount, intervalInMs)
 		if e != nil {
 			return nil, e
@@ -450,7 +489,7 @@ func generateStatFor(rule *Rule) (*standaloneStatistic, error) {
 		retStat.readOnlyMetric = readStat
 		retStat.writeOnlyMetric = nil
 		return &retStat, nil
-	} else if err == base.GlobalStatisticNonReusableError {
+	} else if err == base.GlobalStatisticNonReusableError { // 不能公用
 		logging.Info("[FlowRuleManager] Flow rule couldn't reuse global statistic and will generate independent statistic", "rule", rule)
 		retStat.reuseResourceStat = false
 		realLeapArray := sbase.NewBucketLeapArray(sampleCount, intervalInMs)
@@ -505,6 +544,7 @@ func RemoveTrafficShapingGenerator(tokenCalculateStrategy TokenCalculateStrategy
 	return nil
 }
 
+// 获取指定resourceName的所有TrafficShapingController
 func getTrafficControllerListFor(name string) []*TrafficShapingController {
 	tcMux.RLock()
 	defer tcMux.RUnlock()
@@ -512,6 +552,7 @@ func getTrafficControllerListFor(name string) []*TrafficShapingController {
 	return tcMap[name]
 }
 
+// 找到能重用的trafficShapingController
 func calculateReuseIndexFor(r *Rule, oldResTcs []*TrafficShapingController) (equalIdx, reuseStatIdx int) {
 	// the index of equivalent rule in old traffic shaping controller slice
 	equalIdx = -1
@@ -522,10 +563,12 @@ func calculateReuseIndexFor(r *Rule, oldResTcs []*TrafficShapingController) (equ
 		oldRule := oldTc.BoundRule()
 		if oldRule.isEqualsTo(r) {
 			// break if there is equivalent rule
+			// 相同的规则
 			equalIdx = idx
 			break
 		}
 		// search the index of first stat reusable rule
+		// 搜索第一统计可重用规则的索引
 		if !oldRule.isStatReusable(r) {
 			continue
 		}
@@ -539,6 +582,7 @@ func calculateReuseIndexFor(r *Rule, oldResTcs []*TrafficShapingController) (equ
 }
 
 // buildResourceTrafficShapingController builds TrafficShapingController slice from rules. the resource of rules must be equals to res
+// 根据规则构建TrafficShapingController切片。规则的资源必须等于资源
 func buildResourceTrafficShapingController(res string, rulesOfRes []*Rule, oldResTcs []*TrafficShapingController) []*TrafficShapingController {
 	newTcsOfRes := make([]*TrafficShapingController, 0, len(rulesOfRes))
 	for _, rule := range rulesOfRes {
@@ -549,15 +593,17 @@ func buildResourceTrafficShapingController(res string, rulesOfRes []*Rule, oldRe
 		equalIdx, reuseStatIdx := calculateReuseIndexFor(rule, oldResTcs)
 
 		// First check equals scenario
+		// 有对应的相同的rule，直接重用
 		if equalIdx >= 0 {
-			// reuse the old tc
+			// reuse the old tc 重新使用旧TrafficShapingController
 			equalOldTc := oldResTcs[equalIdx]
 			newTcsOfRes = append(newTcsOfRes, equalOldTc)
-			// remove old tc from oldResTcs
+			// remove old tc from oldResTcs 删除
 			oldResTcs = append(oldResTcs[:equalIdx], oldResTcs[equalIdx+1:]...)
 			continue
 		}
 
+		// 构造函数 生成个控制器
 		generator, supported := tcGenFuncMap[trafficControllerGenKey{
 			tokenCalculateStrategy: rule.TokenCalculateStrategy,
 			controlBehavior:        rule.ControlBehavior,
@@ -569,6 +615,7 @@ func buildResourceTrafficShapingController(res string, rulesOfRes []*Rule, oldRe
 		var tc *TrafficShapingController
 		var e error
 		if reuseStatIdx >= 0 {
+			// 只重用统计信息
 			tc, e = generator(rule, &(oldResTcs[reuseStatIdx].boundStat))
 		} else {
 			tc, e = generator(rule, nil)
@@ -580,6 +627,7 @@ func buildResourceTrafficShapingController(res string, rulesOfRes []*Rule, oldRe
 		}
 		if reuseStatIdx >= 0 {
 			// remove old tc from oldResTcs
+			// 从oldResTcs中移除旧的tc 移除相似的
 			oldResTcs = append(oldResTcs[:reuseStatIdx], oldResTcs[reuseStatIdx+1:]...)
 		}
 		newTcsOfRes = append(newTcsOfRes, tc)
@@ -588,6 +636,7 @@ func buildResourceTrafficShapingController(res string, rulesOfRes []*Rule, oldRe
 }
 
 // IsValidRule checks whether the given Rule is valid.
+// 检查给定的规则是否有效。
 func IsValidRule(rule *Rule) error {
 	if rule == nil {
 		return errors.New("nil Rule")
@@ -618,6 +667,7 @@ func IsValidRule(rule *Rule) error {
 			return errors.New("WarmUpColdFactor must be great than 1")
 		}
 	}
+	// StatIntervalInMs大于10分钟，建议小于10分钟。
 	if rule.StatIntervalInMs > 10*60*1000 {
 		logging.Info("StatIntervalInMs is great than 10 minutes, less than 10 minutes is recommended.")
 	}

@@ -25,7 +25,7 @@ type EntryContext struct {
 	// Use to calculate RT
 	startTime uint64 // 创建EntryContext的时间
 	// the rt of this transaction
-	rt uint64
+	rt uint64 // 响应时间
 
 	Resource *ResourceWrapper // 资源信息
 	StatNode StatNode         // 滑动窗口统计信息
@@ -83,7 +83,7 @@ func NewEmptyEntryContext() *EntryContext {
 
 // The input data of sentinel
 type SentinelInput struct {
-	BatchCount uint32
+	BatchCount uint32 // 资源申请的数量
 	Flag       int32
 	Args       []interface{}
 	// store some values in this context when calling context in slot.

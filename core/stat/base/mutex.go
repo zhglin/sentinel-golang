@@ -28,6 +28,7 @@ type mutex struct {
 }
 
 // TryLock acquires the lock only if it is free at the time of invocation.
+// TryLock只在调用时锁是空闲的情况下获取锁。
 func (tl *mutex) TryLock() bool {
 	return atomic.CompareAndSwapInt32((*int32)(unsafe.Pointer(&tl.Mutex)), 0, mutexLocked)
 }

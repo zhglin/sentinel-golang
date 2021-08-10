@@ -101,6 +101,7 @@ type SlotChain struct {
 }
 
 var (
+	// 返回默认的空EntryContext
 	ctxPool = &sync.Pool{
 		New: func() interface{} {
 			ctx := NewEmptyEntryContext()
@@ -131,7 +132,7 @@ func NewSlotChain() *SlotChain {
 // 从内存池中获取EntryContext对象
 func (sc *SlotChain) GetPooledContext() *EntryContext {
 	ctx := sc.ctxPool.Get().(*EntryContext)
-	ctx.startTime = util.CurrentTimeMillis()
+	ctx.startTime = util.CurrentTimeMillis() // 设置开始时间
 	return ctx
 }
 

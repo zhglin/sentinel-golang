@@ -24,16 +24,18 @@ import (
 	"github.com/alibaba/sentinel-golang/util"
 )
 
+// WarmUpTrafficShapingCalculator 表示通过预热的方式计算当前统计周期内的最大Token数量
+// 预热的计算方式会根据规则中的字段 WarmUpPeriodSec 和 WarmUpColdFactor 来决定预热的曲线。
 type WarmUpTrafficShapingCalculator struct {
 	owner             *TrafficShapingController
-	threshold         float64
-	warmUpPeriodInSec uint32
-	coldFactor        uint32
-	warningToken      uint64
-	maxToken          uint64
-	slope             float64
-	storedTokens      int64
-	lastFilledTime    uint64
+	threshold         float64 // QPS
+	warmUpPeriodInSec uint32  // 预热时长
+	coldFactor        uint32  // 冷启动系数
+	warningToken      uint64  // 稳定的令牌生产速率下令牌桶中存储的令牌数，超过进行冷启动
+	maxToken          uint64  // 令牌桶的最大容量
+	slope             float64 // 斜率，每秒放行请求数的增长速率
+	storedTokens      int64   // 令牌桶当前存储的令牌数量
+	lastFilledTime    uint64  // 上一次生产令牌的时间戳
 }
 
 func (c *WarmUpTrafficShapingCalculator) BoundOwner() *TrafficShapingController {
@@ -46,10 +48,14 @@ func NewWarmUpTrafficShapingCalculator(owner *TrafficShapingController, rule *Ru
 		logging.Warn("[NewWarmUpTrafficShapingCalculator] No set WarmUpColdFactor,use default warm up cold factor value", "defaultWarmUpColdFactor", config.DefaultWarmUpColdFactor)
 	}
 
+	// 计算公式
+	// http://learn.lianglianglee.com/%E4%B8%93%E6%A0%8F/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%20Sentinel%EF%BC%88%E5%AE%8C%EF%BC%89/12%20%E9%99%90%E6%B5%81%E9%99%8D%E7%BA%A7%E4%B8%8E%E6%B5%81%E9%87%8F%E6%95%88%E6%9E%9C%E6%8E%A7%E5%88%B6%E5%99%A8%EF%BC%88%E4%B8%8B%EF%BC%89.md
+	// https://www.javadoop.com/post/rate-limiter
 	warningToken := uint64((float64(rule.WarmUpPeriodSec) * rule.Threshold) / float64(rule.WarmUpColdFactor-1))
 
 	maxToken := warningToken + uint64(2*float64(rule.WarmUpPeriodSec)*rule.Threshold/float64(1.0+rule.WarmUpColdFactor))
 
+	// 斜率
 	slope := float64(rule.WarmUpColdFactor-1.0) / rule.Threshold / float64(maxToken-warningToken)
 
 	warmUpTrafficShapingCalculator := &WarmUpTrafficShapingCalculator{
@@ -69,11 +75,11 @@ func NewWarmUpTrafficShapingCalculator(owner *TrafficShapingController, rule *Ru
 
 func (c *WarmUpTrafficShapingCalculator) CalculateAllowedTokens(_ uint32, _ int32) float64 {
 	metricReadonlyStat := c.BoundOwner().boundStat.readOnlyMetric
-	previousQps := metricReadonlyStat.GetPreviousQPS(base.MetricEventPass)
+	previousQps := metricReadonlyStat.GetPreviousQPS(base.MetricEventPass) // 当前时间的QPS
 	c.syncToken(previousQps)
 
 	restToken := atomic.LoadInt64(&c.storedTokens)
-	if restToken < 0 {
+	if restToken < 0 { // 在并发中，currentValue := atomic.AddInt64(&c.storedTokens, int64(-passQps)); 可能导致storedTokens小于0
 		restToken = 0
 	}
 	if restToken >= int64(c.warningToken) {
@@ -85,17 +91,19 @@ func (c *WarmUpTrafficShapingCalculator) CalculateAllowedTokens(_ uint32, _ int3
 	}
 }
 
+// 每秒更新storedTokens 令牌桶数量
 func (c *WarmUpTrafficShapingCalculator) syncToken(passQps float64) {
+	// 当前时间 去掉毫秒，取秒
 	currentTime := util.CurrentTimeMillis()
 	currentTime = currentTime - currentTime%1000
-
+	// 控制每秒只更新一次
 	oldLastFillTime := atomic.LoadUint64(&c.lastFilledTime)
 	if currentTime <= oldLastFillTime {
 		return
 	}
 
 	oldValue := atomic.LoadInt64(&c.storedTokens)
-	newValue := c.coolDownTokens(currentTime, passQps)
+	newValue := c.coolDownTokens(currentTime, passQps) // 这一秒的令牌数
 
 	if atomic.CompareAndSwapInt64(&c.storedTokens, oldValue, newValue) {
 		if currentValue := atomic.AddInt64(&c.storedTokens, int64(-passQps)); currentValue < 0 {
@@ -105,12 +113,14 @@ func (c *WarmUpTrafficShapingCalculator) syncToken(passQps float64) {
 	}
 }
 
+// 计算currentTime时间的令牌数
 func (c *WarmUpTrafficShapingCalculator) coolDownTokens(currentTime uint64, passQps float64) int64 {
-	oldValue := atomic.LoadInt64(&c.storedTokens)
+	oldValue := atomic.LoadInt64(&c.storedTokens) // 当前的令牌数量
 	newValue := oldValue
 
 	// Prerequisites for adding a token:
 	// When token consumption is much lower than the warning line
+	// 添加令牌的前提条件: 当令牌消耗远低于警戒线时
 	if oldValue < int64(c.warningToken) {
 		newValue = int64(float64(oldValue) + (float64(currentTime)-float64(atomic.LoadUint64(&c.lastFilledTime)))*c.threshold/1000.0)
 	} else if oldValue > int64(c.warningToken) {

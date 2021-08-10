@@ -28,7 +28,7 @@ import (
 // It does not store any data and is the wrapper of BucketLeapArray to adapt to different internal bucket
 // SlidingWindowMetric is used for SentinelRules and BucketLeapArray is used for monitor
 // BucketLeapArray is per resource, and SlidingWindowMetric support only read operation.
-// SlidingWindowMetric表示滑动窗口度量包装器。
+// SlidingWindowMetric表示滑动窗口度量包装器。因为intervalInMs,sampleCount不同但是能兼容，所以在BucketLeapArray之上包装一层，
 // 它不存储任何数据，是BucketLeapArray的包装器，以适应不同的内部桶
 // SlidingWindowMetric用于SentinelRules, BucketLeapArray用于monitor
 // BucketLeapArray是每个资源，SlidingWindowMetric只支持读操作。
@@ -113,12 +113,12 @@ func (m *SlidingWindowMetric) GetPreviousQPS(event base.MetricEvent) float64 {
 	return m.getQPSWithTime(util.CurrentTimeMillis()-uint64(m.bucketLengthInMs), event)
 }
 
-// 获取指定开始时间的qps
+// 获取指定开始时间的qps 总值/秒
 func (m *SlidingWindowMetric) getQPSWithTime(now uint64, event base.MetricEvent) float64 {
 	return float64(m.getSumWithTime(now, event)) / m.getIntervalInSecond()
 }
 
-// 刷选当前时间点的对应的bucket
+// 筛选当前时间点的对应的bucket
 func (m *SlidingWindowMetric) getSatisfiedBuckets(now uint64) []*BucketWrap {
 	start, end := m.getBucketStartRange(now) // 获取bucket的时间范围
 	satisfiedBuckets := m.real.ValuesConditional(now, func(ws uint64) bool {

@@ -27,6 +27,7 @@ const (
 	// AvgRT represents the average response time of all inbound requests.
 	AvgRT
 	// Concurrency represents the concurrency of all inbound requests.
+	// 表示所有入站请求的并发性。
 	Concurrency
 	// InboundQPS represents the QPS of all inbound requests.
 	InboundQPS
