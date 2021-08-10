@@ -28,6 +28,7 @@ var (
 	DefaultSlot = &Slot{}
 )
 
+// Slot 并发隔离控制校验
 type Slot struct {
 }
 
@@ -52,16 +53,19 @@ func (s *Slot) Check(ctx *base.EntryContext) *base.TokenResult {
 	return result
 }
 
+// 校验
 func checkPass(ctx *base.EntryContext) (bool, *Rule, uint32) {
 	statNode := ctx.StatNode
 	batchCount := ctx.Input.BatchCount
 	curCount := uint32(0)
+	// 获取resource的规则
 	for _, rule := range getRulesOfResource(ctx.Resource.Name()) {
 		threshold := rule.Threshold
 		if rule.MetricType == Concurrency {
 			if cur := statNode.CurrentConcurrency(); cur >= 0 {
 				curCount = uint32(cur)
 			} else {
+				// 没并发
 				curCount = 0
 				logging.Error(errors.New("negative concurrency"), "Negative concurrency in isolation.checkPass()", "rule", rule)
 			}

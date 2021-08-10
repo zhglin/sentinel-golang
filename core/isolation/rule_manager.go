@@ -24,14 +24,16 @@ import (
 )
 
 var (
-	ruleMap       = make(map[string][]*Rule)
+	ruleMap       = make(map[string][]*Rule) // 当前生效的有效规则
 	rwMux         = &sync.RWMutex{}
-	currentRules  = make(map[string][]*Rule, 0)
+	currentRules  = make(map[string][]*Rule, 0) // 当前配置的全部规则
 	updateRuleMux = new(sync.Mutex)
 )
 
 // LoadRules loads the given isolation rules to the rule manager, while all previous rules will be replaced.
 // the first returned value indicates whether do real load operation, if the rules is the same with previous rules, return false
+// LoadRules将给定的隔离规则加载到规则管理器，而之前的所有规则将被替换。
+// 第一个返回值指示是否进行实际加载操作，如果规则与前面的规则相同，则返回false
 func LoadRules(rules []*Rule) (bool, error) {
 	resRulesMap := make(map[string][]*Rule, 16)
 	for _, rule := range rules {
@@ -54,6 +56,7 @@ func LoadRules(rules []*Rule) (bool, error) {
 	return true, err
 }
 
+// 生效新规则
 func onRuleUpdate(rawResRulesMap map[string][]*Rule) (err error) {
 	validResRulesMap := make(map[string][]*Rule, len(rawResRulesMap))
 	for res, rules := range rawResRulesMap {
@@ -70,6 +73,7 @@ func onRuleUpdate(rawResRulesMap map[string][]*Rule) (err error) {
 		}
 	}
 
+	// 替换新规则
 	start := util.CurrentTimeNano()
 	rwMux.Lock()
 	ruleMap = validResRulesMap
@@ -83,6 +87,9 @@ func onRuleUpdate(rawResRulesMap map[string][]*Rule) (err error) {
 
 // LoadRulesOfResource loads the given resource's isolation rules to the rule manager, while all previous resource's rules will be replaced.
 // the first returned value indicates whether do real load operation, if the rules is the same with previous resource's rules, return false
+// LoadRulesOfResource将给定资源的隔离规则加载到规则管理器，而之前所有资源的规则将被替换。
+// 第一个返回值指示是否进行实际的加载操作，如果规则与前一个资源的规则相同，则返回false
+// 指定的resource
 func LoadRulesOfResource(res string, rules []*Rule) (bool, error) {
 	if len(res) == 0 {
 		return false, errors.New("empty resource")
@@ -91,7 +98,7 @@ func LoadRulesOfResource(res string, rules []*Rule) (bool, error) {
 	defer updateRuleMux.Unlock()
 	// clear resource rules
 	if len(rules) == 0 {
-		// clear resource's currentRules
+		// clear resource's currentRules 清空
 		delete(currentRules, res)
 		// clear ruleMap
 		rwMux.Lock()
@@ -111,7 +118,9 @@ func LoadRulesOfResource(res string, rules []*Rule) (bool, error) {
 	return true, err
 }
 
+// 生效指定resource的规则
 func onResourceRuleUpdate(res string, rawResRules []*Rule) (err error) {
+	// 校验
 	validResRules := make([]*Rule, 0, len(rawResRules))
 	for _, rule := range rawResRules {
 		if err := IsValidRule(rule); err != nil {
@@ -136,12 +145,14 @@ func onResourceRuleUpdate(res string, rawResRules []*Rule) (err error) {
 }
 
 // ClearRules clears all the rules in isolation module.
+// 清除所有规则
 func ClearRules() error {
 	_, err := LoadRules(nil)
 	return err
 }
 
 // ClearRulesOfResource clears resource level rules in isolation module.
+// 清除指定resource的规则
 func ClearRulesOfResource(res string) error {
 	_, err := LoadRulesOfResource(res, nil)
 	return err
@@ -149,6 +160,7 @@ func ClearRulesOfResource(res string) error {
 
 // GetRules returns all the rules based on copy.
 // It doesn't take effect for isolation module if user changes the rule.
+// 返回基于复制的所有规则。如果用户更改了规则，它对隔离模块不起作用。
 func GetRules() []Rule {
 	rules := getRules()
 	ret := make([]Rule, 0, len(rules))
@@ -160,6 +172,8 @@ func GetRules() []Rule {
 
 // GetRulesOfResource returns specific resource's rules based on copy.
 // It doesn't take effect for isolation module if user changes the rule.
+// GetRulesOfResource返回基于复制的特定资源的规则。
+// 如果用户更改了规则，它对隔离模块不起作用。
 func GetRulesOfResource(res string) []Rule {
 	rules := getRulesOfResource(res)
 	ret := make([]Rule, 0, len(rules))
@@ -171,6 +185,8 @@ func GetRulesOfResource(res string) []Rule {
 
 // getRules returns all the rules。Any changes of rules take effect for isolation module
 // getRules is an internal interface.
+// getRules返回所有规则。
+// 规则的任何更改都对隔离模块生效，getRules是内部接口。
 func getRules() []*Rule {
 	rwMux.RLock()
 	defer rwMux.RUnlock()
@@ -180,6 +196,8 @@ func getRules() []*Rule {
 
 // getRulesOfResource returns specific resource's rules。Any changes of rules take effect for isolation module
 // getRulesOfResource is an internal interface.
+// getRulesOfResource返回特定资源的规则。
+// 规则的任何更改都会因隔离模块getRulesOfResource是内部接口而生效。
 func getRulesOfResource(res string) []*Rule {
 	rwMux.RLock()
 	defer rwMux.RUnlock()
@@ -195,6 +213,7 @@ func getRulesOfResource(res string) []*Rule {
 	return ret
 }
 
+// 转成数组返回
 func rulesFrom(m map[string][]*Rule) []*Rule {
 	rules := make([]*Rule, 0, 8)
 	if len(m) == 0 {
@@ -210,6 +229,7 @@ func rulesFrom(m map[string][]*Rule) []*Rule {
 	return rules
 }
 
+// 记录日志
 func logRuleUpdate(m map[string][]*Rule) {
 	rs := rulesFrom(m)
 	if len(rs) == 0 {
@@ -220,6 +240,7 @@ func logRuleUpdate(m map[string][]*Rule) {
 }
 
 // IsValidRule checks whether the given Rule is valid.
+// 检查给定的规则是否有效。
 func IsValidRule(r *Rule) error {
 	if r == nil {
 		return errors.New("nil isolation rule")

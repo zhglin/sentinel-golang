@@ -95,12 +95,12 @@ func (n *BaseStatNode) MaxConcurrency() int32 {
 	return n.metric.MaxConcurrency()
 }
 
-// CurrentConcurrency 获取请求数
+// CurrentConcurrency 获取并发请求数
 func (n *BaseStatNode) CurrentConcurrency() int32 {
 	return atomic.LoadInt32(&(n.concurrency))
 }
 
-// IncreaseConcurrency 增加获取到资源的请求数   获取到资源加+1
+// IncreaseConcurrency 增加获取到资源的并发请求数   获取到资源加+1
 func (n *BaseStatNode) IncreaseConcurrency() {
 	n.UpdateConcurrency(atomic.AddInt32(&(n.concurrency), 1))
 }
