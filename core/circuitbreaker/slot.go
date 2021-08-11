@@ -44,12 +44,14 @@ func (b *Slot) Check(ctx *base.EntryContext) *base.TokenResult {
 		if result == nil {
 			result = base.NewTokenResultBlockedWithCause(base.BlockTypeCircuitBreaking, msg, rule, nil)
 		} else {
+			// 重置blocked类型
 			result.ResetToBlockedWithCause(base.BlockTypeCircuitBreaking, msg, rule, nil)
 		}
 	}
 	return result
 }
 
+// 校验
 func checkPass(ctx *base.EntryContext) (bool, *Rule) {
 	breakers := getBreakersOfResource(ctx.Resource.Name())
 	for _, breaker := range breakers {

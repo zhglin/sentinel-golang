@@ -24,6 +24,7 @@ type EntryContext struct {
 	err error
 	// Use to calculate RT
 	startTime uint64 // 创建EntryContext的时间
+
 	// the rt of this transaction
 	rt uint64 // 响应时间
 
@@ -58,6 +59,7 @@ func (ctx *EntryContext) StartTime() uint64 {
 	return ctx.startTime
 }
 
+// IsBlocked 执行结果是否blocked
 func (ctx *EntryContext) IsBlocked() bool {
 	if ctx.RuleCheckResult == nil {
 		return false
@@ -65,10 +67,12 @@ func (ctx *EntryContext) IsBlocked() bool {
 	return ctx.RuleCheckResult.IsBlocked()
 }
 
+// PutRt 写入执行时间
 func (ctx *EntryContext) PutRt(rt uint64) {
 	ctx.rt = rt
 }
 
+// Rt 获取并写入执行时间
 func (ctx *EntryContext) Rt() uint64 {
 	if ctx.rt == 0 {
 		rt := util.CurrentTimeMillis() - ctx.StartTime()

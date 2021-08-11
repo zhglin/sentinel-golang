@@ -21,6 +21,9 @@ import (
 )
 
 // TraceError records the provided error to the given SentinelEntry.
+// 将提供的错误记录到给定的SentinelEntry。
+// 这里的错误比例熔断和错误计数熔断指的业务返回错误的比例或则计数。
+// 也就是说，如果规则指定熔断器策略采用错误比例或则错误计数，那么为了统计错误比例或错误计数，需要调用TraceError(entry, err) 埋点每个请求的业务异常。
 func TraceError(entry *base.SentinelEntry, err error) {
 	defer func() {
 		if e := recover(); e != nil {

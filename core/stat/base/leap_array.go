@@ -262,6 +262,7 @@ func (la *LeapArray) Values() []*BucketWrap {
 	return la.valuesWithTime(util.CurrentTimeMillis())
 }
 
+// 获取指定now时间的所有有效的bucket
 func (la *LeapArray) valuesWithTime(now uint64) []*BucketWrap {
 	if now <= 0 {
 		return make([]*BucketWrap, 0)
@@ -302,6 +303,7 @@ func (la *LeapArray) isBucketDeprecated(now uint64, ww *BucketWrap) bool {
 
 // BucketGenerator Generic interface to generate bucket
 // 生成桶的bucket的通用接口
+// 不同的规则的统计数据类型不同
 type BucketGenerator interface {
 	// NewEmptyBucket called when timestamp entry a new slot interval
 	// 当时间戳条目为新的槽间隔时调用

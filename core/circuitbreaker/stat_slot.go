@@ -45,11 +45,12 @@ func (c *MetricStatSlot) OnEntryBlocked(_ *base.EntryContext, _ *base.BlockError
 	return
 }
 
+// OnCompleted 请求结束后进行信息统计
 func (c *MetricStatSlot) OnCompleted(ctx *base.EntryContext) {
 	res := ctx.Resource.Name()
-	err := ctx.Err()
-	rt := ctx.Rt()
+	err := ctx.Err() // 异常信息
+	rt := ctx.Rt()   // 请求时间
 	for _, cb := range getBreakersOfResource(res) {
-		cb.OnRequestComplete(rt, err)
+		cb.OnRequestComplete(rt, err) // 状态处理
 	}
 }

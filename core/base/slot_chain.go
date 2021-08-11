@@ -136,7 +136,7 @@ func (sc *SlotChain) GetPooledContext() *EntryContext {
 	return ctx
 }
 
-// RefurbishContext 重置并返回到内存池
+// RefurbishContext 重置EntryContext并返回到内存池
 func (sc *SlotChain) RefurbishContext(c *EntryContext) {
 	if c != nil {
 		c.Reset()
@@ -254,16 +254,20 @@ func (sc *SlotChain) Entry(ctx *EntryContext) *TokenResult {
 	return ruleCheckRet
 }
 
+// slotChain退出并执行onCompleted函数
 func (sc *SlotChain) exit(ctx *EntryContext) {
 	if ctx == nil || ctx.Entry() == nil {
 		logging.Error(errors.New("entryContext or SentinelEntry is nil"),
 			"EntryContext or SentinelEntry is nil in SlotChain.exit()", "ctx", ctx)
 		return
 	}
+
 	// The OnCompleted is called only when entry passed
+	// 只有pass才会调用OnCompleted
 	if ctx.IsBlocked() {
 		return
 	}
+
 	for _, s := range sc.stats {
 		s.OnCompleted(ctx)
 	}

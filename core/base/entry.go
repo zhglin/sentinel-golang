@@ -28,12 +28,13 @@ type SentinelEntry struct {
 	// one entry bounds with one context
 	ctx *EntryContext
 
-	exitHandlers []ExitHandler
+	exitHandlers []ExitHandler // exit()时的钩子函数
 	// each entry holds a slot chain.
 	// it means this entry will go through the sc
+	// 每个条目包含一个槽链。这意味着这个条目将通过的槽链
 	sc *SlotChain
 
-	exitCtl sync.Once
+	exitCtl sync.Once // 确保每个sentinelEntry只执行一次Exit
 }
 
 func NewSentinelEntry(ctx *EntryContext, rw *ResourceWrapper, sc *SlotChain) *SentinelEntry {
@@ -74,6 +75,7 @@ func WithError(err error) ExitOption {
 	}
 }
 
+// Exit sentinelEntry退出函数 熔断需要手动调用
 func (e *SentinelEntry) Exit(exitOps ...ExitOption) {
 	var options = ExitOptions{
 		err: nil,
@@ -94,7 +96,7 @@ func (e *SentinelEntry) Exit(exitOps ...ExitOption) {
 				logging.Error(errors.Errorf("%+v", err), "Sentinel internal panic in SentinelEntry.Exit()")
 			}
 			if e.sc != nil {
-				e.sc.RefurbishContext(ctx)
+				e.sc.RefurbishContext(ctx) // 返还ctx
 			}
 		}()
 		for _, handler := range e.exitHandlers {

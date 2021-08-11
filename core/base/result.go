@@ -44,6 +44,7 @@ var (
 )
 
 // RegistryBlockType adds block type and corresponding description in order.
+// 依次添加block类型及相应的描述。
 func RegistryBlockType(blockType BlockType, desc string) error {
 	_, exist := blockTypeMap[blockType]
 	if exist {
@@ -86,8 +87,8 @@ func (s TokenResultStatus) String() string {
 type TokenResult struct {
 	status TokenResultStatus
 
-	blockErr    *BlockError
-	nanosToWait time.Duration
+	blockErr    *BlockError   // block的信息
+	nanosToWait time.Duration // 排队等待时间
 }
 
 func (r *TokenResult) DeepCopyFrom(newResult *TokenResult) {
@@ -132,6 +133,7 @@ func (r *TokenResult) ResetToBlockedWithMessage(blockType BlockType, blockMsg st
 	r.ResetToBlockedWith(WithBlockType(blockType), WithBlockMsg(blockMsg))
 }
 
+// ResetToBlockedWithCause 重置block的类型
 func (r *TokenResult) ResetToBlockedWithCause(blockType BlockType, blockMsg string, rule SentinelRule, snapshot interface{}) {
 	r.ResetToBlockedWith(WithBlockType(blockType), WithBlockMsg(blockMsg), WithRule(rule), WithSnapshotValue(snapshot))
 }

@@ -173,9 +173,12 @@ func entry(resource string, options *EntryOptions) (*base.SentinelEntry, *base.B
 		// This indicates internal error in some slots, so just pass
 		return e, nil
 	}
+	// 熔断的规则，半开状态的探测流量result不是blocked，调用完手动指定e.Exit
 	if r.Status() == base.ResultStatusBlocked {
 		// r will be put to Pool in calling Exit()
 		// must finish the lifecycle of r.
+		// 在调用Exit()必须完成r的生命周期时，r将被放入Pool。
+		// TokenResult是ctx中的引用
 		blockErr := base.NewBlockErrorFromDeepCopy(r.BlockError())
 		e.Exit()
 		return nil, blockErr

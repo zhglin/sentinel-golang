@@ -38,7 +38,7 @@ func BuildDefaultSlotChain() *base.SlotChain {
 
 	sc.AddRuleCheckSlot(system.DefaultAdaptiveSlot) // 系统自适应保护的校验
 	sc.AddRuleCheckSlot(flow.DefaultSlot)           // 流量控制校验
-	sc.AddRuleCheckSlot(isolation.DefaultSlot)
+	sc.AddRuleCheckSlot(isolation.DefaultSlot)      // 并发隔离控制
 	sc.AddRuleCheckSlot(hotspot.DefaultSlot)
 	sc.AddRuleCheckSlot(circuitbreaker.DefaultSlot)
 

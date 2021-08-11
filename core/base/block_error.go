@@ -57,6 +57,7 @@ func WithSnapshotValue(snapshotValue interface{}) BlockErrorOption {
 	}
 }
 
+// NewBlockError 创建blockError
 func NewBlockError(opts ...BlockErrorOption) *BlockError {
 	b := &BlockError{
 		blockType: BlockTypeUnknown,
