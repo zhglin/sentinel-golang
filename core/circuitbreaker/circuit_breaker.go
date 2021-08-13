@@ -307,7 +307,7 @@ func (b *slowRtCircuitBreaker) OnRequestComplete(rt uint64, _ error) {
 			"rule", b.rule)
 		return
 	}
-	// 超过满请求设置的进行记录
+	// 超过慢请求设置的进行记录
 	if rt > b.maxAllowedRt {
 		atomic.AddUint64(&counter.slowCount, 1)
 	}

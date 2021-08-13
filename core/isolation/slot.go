@@ -55,7 +55,7 @@ func (s *Slot) Check(ctx *base.EntryContext) *base.TokenResult {
 
 // 校验
 func checkPass(ctx *base.EntryContext) (bool, *Rule, uint32) {
-	statNode := ctx.StatNode
+	statNode := ctx.StatNode // 全局的统计信息
 	batchCount := ctx.Input.BatchCount
 	curCount := uint32(0)
 	// 获取resource的规则

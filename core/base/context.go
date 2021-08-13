@@ -89,8 +89,9 @@ func NewEmptyEntryContext() *EntryContext {
 type SentinelInput struct {
 	BatchCount uint32 // 资源申请的数量
 	Flag       int32
-	Args       []interface{}
+	Args       []interface{} // 热点参数流控的参数
 	// store some values in this context when calling context in slot.
+	// 当调用slot中的context时，在这个上下文中存储一些值。
 	Attachments map[interface{}]interface{}
 }
 

@@ -41,10 +41,12 @@ func (s *Slot) Check(ctx *base.EntryContext) *base.TokenResult {
 	result := ctx.RuleCheckResult
 	tcs := getTrafficControllersFor(res)
 	for _, tc := range tcs {
+		// 提取参数值
 		arg := tc.ExtractArgs(ctx)
 		if arg == nil {
 			continue
 		}
+		// 校验是否超过阀值
 		r := canPassCheck(tc, arg, batch)
 		if r == nil {
 			continue

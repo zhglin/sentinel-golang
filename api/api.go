@@ -95,6 +95,7 @@ func WithFlag(flag int32) EntryOption {
 }
 
 // WithArgs sets the resource entry with the given additional parameters.
+// 热点参数流控 设置的参数
 func WithArgs(args ...interface{}) EntryOption {
 	return func(opts *EntryOptions) {
 		opts.args = append(opts.args, args...)

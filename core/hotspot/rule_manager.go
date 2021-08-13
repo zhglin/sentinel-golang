@@ -32,18 +32,20 @@ type trafficControllerMap map[string][]TrafficShapingController
 
 var (
 	tcGenFuncMap  = make(map[ControlBehavior]TrafficControllerGenFunc, 4)
-	tcMap         = make(trafficControllerMap)
+	tcMap         = make(trafficControllerMap) // 当前的流量控制器
 	tcMux         = new(sync.RWMutex)
-	currentRules  = make(map[string][]*Rule, 0)
+	currentRules  = make(map[string][]*Rule, 0) // 当前有效的规则
 	updateRuleMux = new(sync.Mutex)
 )
 
 func init() {
 	// Initialize the traffic shaping controller generator map for existing control behaviors.
+	// 为现有的控制行为初始化流量整形控制器生成器映射。
 	tcGenFuncMap[Reject] = func(r *Rule, reuseMetric *ParamsMetric) TrafficShapingController {
 		var baseTc *baseTrafficShapingController
 		if reuseMetric != nil {
 			// new BaseTrafficShapingController with reuse statistic metric
+			// 具有重用统计度量的新BaseTrafficShapingController
 			baseTc = newBaseTrafficShapingControllerWithMetric(r, reuseMetric)
 		} else {
 			baseTc = newBaseTrafficShapingController(r)
@@ -74,6 +76,7 @@ func init() {
 	}
 }
 
+// 获取指定resource的控制器
 func getTrafficControllersFor(res string) []TrafficShapingController {
 	tcMux.RLock()
 	defer tcMux.RUnlock()
@@ -85,6 +88,8 @@ func getTrafficControllersFor(res string) []TrafficShapingController {
 // Return value:
 //   bool: indicates whether the internal map has been changed;
 //   error: indicates whether occurs the error.
+// LoadRules用给定的规则替换所有旧的热点参数流规则。
+// 返回值: bool:指示内部映射是否已更改; error:表示是否发生错误。
 func LoadRules(rules []*Rule) (bool, error) {
 	resRulesMap := make(map[string][]*Rule, 16)
 	for _, rule := range rules {
@@ -95,6 +100,7 @@ func LoadRules(rules []*Rule) (bool, error) {
 		resRulesMap[rule.Resource] = append(resRules, rule)
 	}
 
+	// 是否相等
 	updateRuleMux.Lock()
 	defer updateRuleMux.Unlock()
 	isEqual := reflect.DeepEqual(currentRules, resRulesMap)
@@ -103,6 +109,7 @@ func LoadRules(rules []*Rule) (bool, error) {
 		return false, nil
 	}
 
+	// 更新
 	err := onRuleUpdate(resRulesMap)
 	return true, err
 }
@@ -111,6 +118,8 @@ func LoadRules(rules []*Rule) (bool, error) {
 // It doesn't take effect for hotspot module if user changes the returned rules.
 // GetRules need to compete hotspot module's global lock and the high performance losses of copy,
 // 		reduce or do not call GetRules if possible.
+// GetRules返回所有基于copy的规则。如果用户改变了返回的规则，它不生效。
+// GetRules需要竞争全局锁和复制的高性能损失，如果可能的话，减少或不调用GetRules。
 func GetRules() []Rule {
 	tcMux.RLock()
 	rules := rulesFrom(tcMap)
@@ -127,6 +136,8 @@ func GetRules() []Rule {
 // It doesn't take effect for hotspot module if user changes the returned rules.
 // GetRulesOfResource need to compete hotspot module's global lock and the high performance losses of copy,
 // 		reduce or do not call GetRulesOfResource frequently if possible.
+// GetRulesOfResource返回特定资源的规则。如果用户改变了返回的规则，它不生效。
+// GetRulesOfResource需要竞争x全局锁和复制的高性能损失，如果可能的话，减少或不频繁调用GetRulesOfResource。
 func GetRulesOfResource(res string) []Rule {
 	tcMux.RLock()
 	resTcs := tcMap[res]
@@ -140,17 +151,20 @@ func GetRulesOfResource(res string) []Rule {
 }
 
 // ClearRules clears all hotspot param flow rules.
+// 清除所有规则
 func ClearRules() error {
 	_, err := LoadRules(nil)
 	return err
 }
 
 // ClearRulesOfResource clears resource level hotspot param flow rules.
+// 清楚指定resource的规则
 func ClearRulesOfResource(res string) error {
 	_, err := LoadRulesOfResource(res, nil)
 	return err
 }
 
+// 更新新rule
 func onRuleUpdate(rawResRulesMap map[string][]*Rule) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -163,6 +177,7 @@ func onRuleUpdate(rawResRulesMap map[string][]*Rule) (err error) {
 	}()
 
 	// ignore invalid rules
+	// 忽略不合法的规则
 	validResRulesMap := make(map[string][]*Rule, len(rawResRulesMap))
 	for res, rules := range rawResRulesMap {
 		validResRules := make([]*Rule, 0, len(rules))
@@ -180,6 +195,7 @@ func onRuleUpdate(rawResRulesMap map[string][]*Rule) (err error) {
 
 	start := util.CurrentTimeNano()
 
+	// 复制旧的控制器
 	tcMux.RLock()
 	tcMapClone := make(trafficControllerMap, len(tcMap))
 	for res, tcs := range tcMap {
@@ -189,11 +205,13 @@ func onRuleUpdate(rawResRulesMap map[string][]*Rule) (err error) {
 	}
 	tcMux.RUnlock()
 
+	// 对有效的新规则创建新的控制器
 	m := make(trafficControllerMap, len(validResRulesMap))
 	for res, rules := range validResRulesMap {
 		m[res] = buildResourceTrafficShapingController(res, rules, tcMapClone[res])
 	}
 
+	// 替换
 	tcMux.Lock()
 	tcMap = m
 	tcMux.Unlock()
@@ -205,6 +223,7 @@ func onRuleUpdate(rawResRulesMap map[string][]*Rule) (err error) {
 	return nil
 }
 
+// 更新指定resource的规则控制器
 func onResourceRuleUpdate(res string, rawResRules []*Rule) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -216,6 +235,7 @@ func onResourceRuleUpdate(res string, rawResRules []*Rule) (err error) {
 		}
 	}()
 
+	// 规则校验
 	validResRules := make([]*Rule, 0, len(rawResRules))
 	for _, rule := range rawResRules {
 		if err := IsValidRule(rule); err != nil {
@@ -225,14 +245,17 @@ func onResourceRuleUpdate(res string, rawResRules []*Rule) (err error) {
 		validResRules = append(validResRules, rule)
 	}
 
+	// 复制旧控制器
 	start := util.CurrentTimeNano()
 	oldResTcs := make([]TrafficShapingController, 0, 8)
 	tcMux.RLock()
 	oldResTcs = append(oldResTcs, tcMap[res]...)
 	tcMux.RUnlock()
 
+	// 创建新控制器
 	newResTcs := buildResourceTrafficShapingController(res, validResRules, oldResTcs)
 
+	// 替换
 	tcMux.Lock()
 	if len(newResTcs) == 0 {
 		delete(tcMap, res)
@@ -251,6 +274,7 @@ func onResourceRuleUpdate(res string, rawResRules []*Rule) (err error) {
 // LoadRulesOfResource loads the given resource's hotspot param flow rules to the rule manager,
 // while all previous resource's rules will be replaced. The first returned value indicates whether
 // do real load operation, if the rules is the same with previous resource's rules, return false.
+// 替换指定resource的规则
 func LoadRulesOfResource(res string, rules []*Rule) (bool, error) {
 	if len(res) == 0 {
 		return false, errors.New("empty resource")
@@ -260,6 +284,7 @@ func LoadRulesOfResource(res string, rules []*Rule) (bool, error) {
 	defer updateRuleMux.Unlock()
 
 	// clear resource rules
+	// 清除规则
 	if len(rules) == 0 {
 		// clear resource's currentRules
 		delete(currentRules, res)
@@ -272,16 +297,19 @@ func LoadRulesOfResource(res string, rules []*Rule) (bool, error) {
 	}
 
 	// load resource level rules
+	// 是否相等
 	isEqual := reflect.DeepEqual(currentRules[res], rules)
 	if isEqual {
 		logging.Info("[HotSpot] Load resource level hotspot param flow rules is the same with current resource level rules, so ignore load operation.")
 		return false, nil
 	}
 
+	// 更新
 	err := onResourceRuleUpdate(res, rules)
 	return true, err
 }
 
+// 记录日志
 func logRuleUpdate(m map[string][]*Rule) {
 	rules := make([]*Rule, 0, 8)
 	for _, rs := range m {
@@ -297,6 +325,7 @@ func logRuleUpdate(m map[string][]*Rule) {
 	}
 }
 
+// 返回控制器中所有有效的规则
 func rulesFrom(m trafficControllerMap) []*Rule {
 	rules := make([]*Rule, 0, 8)
 	if len(m) == 0 {
@@ -315,6 +344,7 @@ func rulesFrom(m trafficControllerMap) []*Rule {
 	return rules
 }
 
+// 从旧的控制器中获取相等或者能重用的控制器下标
 func calculateReuseIndexFor(r *Rule, oldResTcs []TrafficShapingController) (equalIdx, reuseStatIdx int) {
 	// the index of equivalent rule in old traffic shaping controller slice
 	equalIdx = -1
@@ -342,6 +372,7 @@ func calculateReuseIndexFor(r *Rule, oldResTcs []TrafficShapingController) (equa
 }
 
 // buildResourceTrafficShapingController builds TrafficShapingController slice from rules. the resource of rules must be equals to res.
+// 根据规则构建TrafficShapingController切片。规则的resource必须等于res。
 func buildResourceTrafficShapingController(res string, resRules []*Rule, oldResTcs []TrafficShapingController) []TrafficShapingController {
 	newTcsOfRes := make([]TrafficShapingController, 0, len(resRules))
 	for _, rule := range resRules {
@@ -352,15 +383,18 @@ func buildResourceTrafficShapingController(res string, resRules []*Rule, oldResT
 
 		equalIdx, reuseStatIdx := calculateReuseIndexFor(rule, oldResTcs)
 		// there is equivalent rule in old traffic shaping controller slice
+		// 有相等的规则控制器直接重用
 		if equalIdx >= 0 {
 			equalOldTC := oldResTcs[equalIdx]
 			newTcsOfRes = append(newTcsOfRes, equalOldTC)
 			// remove old tc from old resTcs
+			// 删除调旧的控制器
 			oldResTcs = append(oldResTcs[:equalIdx], oldResTcs[equalIdx+1:]...)
 			continue
 		}
 
 		// generate new traffic shaping controller
+		// 生成新的流量整形控制器
 		generator, supported := tcGenFuncMap[rule.ControlBehavior]
 		if !supported {
 			logging.Warn("[HotSpot buildResourceTrafficShapingController] Ignoring the hotspot param flow rule due to unsupported control behavior", "rule", rule)
@@ -369,10 +403,13 @@ func buildResourceTrafficShapingController(res string, resRules []*Rule, oldResT
 		var tc TrafficShapingController
 		if reuseStatIdx >= 0 {
 			// generate new traffic shaping controller with reusable statistic metric.
+			// 使用可重用的统计度量生成新的流量整形控制器。
 			tc = generator(rule, oldResTcs[reuseStatIdx].BoundMetric())
 			// remove the reused traffic shaping controller old res tcs
+			// 删除重用的流量整形控制器
 			oldResTcs = append(oldResTcs[:reuseStatIdx], oldResTcs[reuseStatIdx+1:]...)
 		} else {
+			// 生成全新的控制器
 			tc = generator(rule, nil)
 		}
 		if tc == nil {
@@ -385,6 +422,7 @@ func buildResourceTrafficShapingController(res string, resRules []*Rule, oldResT
 	return newTcsOfRes
 }
 
+// IsValidRule 是否有效
 func IsValidRule(rule *Rule) error {
 	if rule == nil {
 		return errors.New("nil hotspot Rule")
@@ -410,6 +448,7 @@ func IsValidRule(rule *Rule) error {
 	return checkControlBehaviorField(rule)
 }
 
+// 校验规则中的控制行为
 func checkControlBehaviorField(rule *Rule) error {
 	switch rule.ControlBehavior {
 	case Reject:
@@ -429,6 +468,8 @@ func checkControlBehaviorField(rule *Rule) error {
 
 // SetTrafficShapingGenerator sets the traffic controller generator for the given control behavior.
 // Note that modifying the generator of default control behaviors is not allowed.
+// SetTrafficShapingGenerator为给定的控制行为设置流量控制器生成器。
+// 修改默认控制行为的生成器是不允许的。
 func SetTrafficShapingGenerator(cb ControlBehavior, generator TrafficControllerGenFunc) error {
 	if generator == nil {
 		return errors.New("nil generator")
@@ -443,6 +484,7 @@ func SetTrafficShapingGenerator(cb ControlBehavior, generator TrafficControllerG
 	return nil
 }
 
+// RemoveTrafficShapingGenerator 删除给定的非默认的流量控制器生成器
 func RemoveTrafficShapingGenerator(cb ControlBehavior) error {
 	if cb >= Reject && cb <= Throttling {
 		return errors.New("not allowed to replace the generator for default control behaviors")

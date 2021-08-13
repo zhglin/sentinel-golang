@@ -19,6 +19,8 @@ import (
 )
 
 // LruCacheMap use LRU strategy to cache the most frequently accessed hotspot parameter
+// 使用LRU策略缓存访问最频繁的热点参数
+// LRU非并发安全，lruCacheMap进行包装加锁
 type LruCacheMap struct {
 	// Not thread safe
 	lru  *LRU
@@ -90,6 +92,7 @@ func (c *LruCacheMap) Purge() {
 	c.lru.Purge()
 }
 
+// NewLRUCacheMap 创建cache
 func NewLRUCacheMap(size int) ConcurrentCounterCache {
 	lru, err := NewLRU(size, nil)
 	if err != nil {

@@ -37,17 +37,21 @@ func (s *ConcurrencyStatSlot) Order() uint32 {
 	return StatSlotOrder
 }
 
+// OnEntryPassed 更新并发数
 func (c *ConcurrencyStatSlot) OnEntryPassed(ctx *base.EntryContext) {
 	res := ctx.Resource.Name()
 	tcs := getTrafficControllersFor(res)
 	for _, tc := range tcs {
+		// 非并发类型
 		if tc.BoundRule().MetricType != Concurrency {
 			continue
 		}
+		// 提取参数值
 		arg := tc.ExtractArgs(ctx)
 		if arg == nil {
 			continue
 		}
+		// 获取arg的统计数据
 		metric := tc.BoundMetric()
 		concurrencyPtr, existed := metric.ConcurrencyCounter.Get(arg)
 		if !existed || concurrencyPtr == nil {
@@ -56,6 +60,7 @@ func (c *ConcurrencyStatSlot) OnEntryPassed(ctx *base.EntryContext) {
 			}
 			continue
 		}
+		// 累加
 		atomic.AddInt64(concurrencyPtr, 1)
 	}
 }
@@ -64,6 +69,7 @@ func (c *ConcurrencyStatSlot) OnEntryBlocked(ctx *base.EntryContext, blockError 
 	// Do nothing
 }
 
+// OnCompleted 请求结束减少并发数
 func (c *ConcurrencyStatSlot) OnCompleted(ctx *base.EntryContext) {
 	res := ctx.Resource.Name()
 	tcs := getTrafficControllersFor(res)
