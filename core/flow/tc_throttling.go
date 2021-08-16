@@ -38,6 +38,8 @@ type ThrottlingChecker struct {
 	lastPassedTime    int64 // 最后一次通过的时间
 }
 
+// NewThrottlingChecker 漏桶算法 严格控制请求通过的间隔时间，也即是让请求以均匀的速度通过，
+// 主要用于处理间隔性突发的流量，在某一秒有大量的请求到来，而接下来的几秒则处于空闲状态，我们希望系统能够在接下来的空闲期间逐渐处理这些请求，而不是在第一秒直接拒绝多余的请求。
 func NewThrottlingChecker(owner *TrafficShapingController, timeoutMs uint32, statIntervalMs uint32) *ThrottlingChecker {
 	var statIntervalNs int64
 	if statIntervalMs == 0 {

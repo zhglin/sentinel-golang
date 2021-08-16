@@ -75,7 +75,7 @@ func NewWarmUpTrafficShapingCalculator(owner *TrafficShapingController, rule *Ru
 
 func (c *WarmUpTrafficShapingCalculator) CalculateAllowedTokens(_ uint32, _ int32) float64 {
 	metricReadonlyStat := c.BoundOwner().boundStat.readOnlyMetric
-	previousQps := metricReadonlyStat.GetPreviousQPS(base.MetricEventPass) // 当前时间的QPS
+	previousQps := metricReadonlyStat.GetPreviousQPS(base.MetricEventPass) // 之前时间的QPS
 	c.syncToken(previousQps)
 
 	restToken := atomic.LoadInt64(&c.storedTokens)
@@ -124,6 +124,8 @@ func (c *WarmUpTrafficShapingCalculator) coolDownTokens(currentTime uint64, pass
 	if oldValue < int64(c.warningToken) {
 		newValue = int64(float64(oldValue) + (float64(currentTime)-float64(atomic.LoadUint64(&c.lastFilledTime)))*c.threshold/1000.0)
 	} else if oldValue > int64(c.warningToken) {
+		// 如果当前通过的 QPS 大于 count/coldFactor，说明系统消耗令牌的速度，大于冷却速度
+		//    那么不需要添加令牌，否则需要添加令牌
 		if passQps < float64(uint32(c.threshold)/c.coldFactor) {
 			newValue = int64(float64(oldValue) + float64(currentTime-atomic.LoadUint64(&c.lastFilledTime))*c.threshold/1000.0)
 		}

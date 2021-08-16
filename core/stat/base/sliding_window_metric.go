@@ -61,10 +61,10 @@ func NewSlidingWindowMetric(sampleCount, intervalInMs uint32, real *BucketLeapAr
 // Get the start time range of the bucket for the provided time.
 // The actual time span is: [start, end + in.bucketTimeLength)
 // 根据提供的时间获取桶的时间范围
-// 实际时间跨度为:[start, end + in.bucketTimeLength] todo
+// 实际时间跨度为:[start, end + in.bucketTimeLength]
 func (m *SlidingWindowMetric) getBucketStartRange(timeMs uint64) (start, end uint64) {
 	curBucketStartTime := calculateStartTime(timeMs, m.real.BucketLengthInMs())
-	end = curBucketStartTime
+	end = curBucketStartTime // calculateStartTime减去了当前的bucket
 	start = end - uint64(m.intervalInMs) + uint64(m.real.BucketLengthInMs())
 	return
 }
